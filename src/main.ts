@@ -9,7 +9,7 @@ async function bootstrap() {
       'http://localhost:8082',   // Expo Web
       'http://localhost:19006',  // Expo old web port
       'http://10.157.1.170:8082', // LAN Expo
-      'http://10.113.6.202:8082',
+      'http://10.157.3.69:8082',
       'http://10.0.2.2:8081',     // Android emulator HTTP
       '*',                        // last fallback
     ],

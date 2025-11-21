@@ -5,6 +5,9 @@ import { DataSource } from 'typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './auth/roles.guard';
+
 
 @Module({
   imports: [
@@ -25,7 +28,13 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
   ],
    controllers: [AppController], // 👈 Make sure this line exists
-   providers: [AppService],
+   providers: [
+       AppService,
+       {
+         provide: APP_GUARD,
+         useClass: RolesGuard,
+       },
+     ],
 })
 export class AppModule implements OnModuleInit {
   private readonly logger = new Logger(AppModule.name);

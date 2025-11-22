@@ -1,20 +1,39 @@
-import { Controller, Post, Get, Body, Req, UseGuards } from '@nestjs/common';
+
+import { Controller, Post, Get, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { JobService } from './job.service';
+import { CreateJobDto } from '../dto/create-job.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { GetUser } from '../auth/get-user.decorator';
+import { User } from '../entities/user.entity';
 
 @Controller('jobs')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class JobController {
   constructor(private jobService: JobService) {}
 
-  @UseGuards(JwtAuthGuard)
-  @Post('create')
-  createJob(@Body() body: any, @Req() req) {
-    return this.jobService.createJob(body, req.user.sub);
+  @Post()
+  @Roles('client')
+  createJob(@GetUser() user: User, @Body() dto: CreateJobDto) {
+    return this.jobService.createJob(user, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Get('list')
-  listJobs() {
-    return this.jobService.listJobs();
+  @Get('my')
+  @Roles('client', 'technician')
+  getMyJobs(@GetUser() user: User) {
+    return this.jobService.getMyJobs(user);
+  }
+
+  @Get('pending')
+  @Roles('technician')
+  getPendingJobs() {
+    return this.jobService.getPendingJobs();
+  }
+
+  @Post(':id/accept')
+  @Roles('technician')
+  acceptJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
+    return this.jobService.acceptJob(user, id);
   }
 }

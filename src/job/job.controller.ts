@@ -1,4 +1,3 @@
-
 import { Controller, Post, Get, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { JobService } from './job.service';
 import { CreateJobDto } from '../dto/create-job.dto';
@@ -25,15 +24,21 @@ export class JobController {
     return this.jobService.getMyJobs(user);
   }
 
-  @Get('pending')
+  @Get('assigned')
   @Roles('technician')
-  getPendingJobs() {
-    return this.jobService.getPendingJobs();
+  getAssignedJobs(@GetUser() user: User) {
+    return this.jobService.getAssignedJobs(user);
   }
 
   @Post(':id/accept')
   @Roles('technician')
   acceptJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.jobService.acceptJob(user, id);
+  }
+
+  @Post(':id/decline')
+  @Roles('technician')
+  declineJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
+    return this.jobService.declineJob(user, id);
   }
 }

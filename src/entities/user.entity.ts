@@ -25,4 +25,14 @@ export class User {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @Column({ nullable: true })
+  latitude?: number;
+
+  @Column({ nullable: true })
+  longitude?: number;
+
+  @Column({ default: true })
+  isAvailable: boolean;
+
 }

@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JobModule } from './job/job.module';
+import { ServicesModule } from './services/services.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { JobModule } from './job/job.module';
 //    TypeOrmModule.forFeature([User]),
     AuthModule,
     JobModule,
+    ServicesModule,
   ],
    controllers: [AppController], // 👈 Make sure this line exists
    providers: [AppService],

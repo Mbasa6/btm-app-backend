@@ -102,4 +102,12 @@ export class JobService {
       relations: ['technician', 'client'],
     });
   }
+
+  /** ADMIN: GET ALL JOBS */
+    async getAllJobs() {
+      return this.jobsRepo.find({
+        relations: ['client', 'technician'],
+        order: { id: 'DESC' }
+      });
+    }
 }

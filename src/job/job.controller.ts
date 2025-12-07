@@ -41,4 +41,11 @@ export class JobController {
   declineJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.jobService.declineJob(user, id);
   }
+
+  @Get()
+  @Roles('admin')
+  getAllJobs() {
+    return this.jobService.getAllJobs();
+  }
+
 }

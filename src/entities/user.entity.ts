@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
+import { Job } from './job.entity';
 
 export type UserRole = 'client' | 'technician' | 'admin';
 
@@ -38,5 +39,11 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  // 🔗 CLIENT JOBS
+  @OneToMany(() => Job, (job) => job.client)
+  clientJobs: Job[];
 
+  // 🔗 TECHNICIAN JOBS
+  @OneToMany(() => Job, (job) => job.technician)
+  technicianJobs: Job[];
 }

@@ -20,10 +20,13 @@ export class Job {
   })
   status: JobStatus;
 
-  @ManyToOne(() => User, (user) => user.id)
+  @ManyToOne(() => User, (user) => user.clientJobs, { eager: false })
   client: User;
 
-  @ManyToOne(() => User, (user) => user.id, { nullable: true })
+  @ManyToOne(() => User, (user) => user.technicianJobs, {
+    nullable: true,
+    eager: false,
+  })
   technician: User | null;
 
   @CreateDateColumn()

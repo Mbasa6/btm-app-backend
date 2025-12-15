@@ -57,7 +57,16 @@ export class UserController {
     return this.userService.getUserJobs(id);
   }
 
+  @Patch(':id/activate')
+  @Roles('admin')
+  activateUser(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.setUserActiveStatus(id, true);
+  }
 
-
+  @Patch(':id/deactivate')
+  @Roles('admin')
+  deactivateUser(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.setUserActiveStatus(id, false);
+  }
 
 }

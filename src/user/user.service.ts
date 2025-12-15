@@ -95,8 +95,12 @@ export class UserService {
     };
   }
 
+  async setUserActiveStatus(userId: number, isActive: boolean) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
 
-
-
+    user.isActive = isActive;
+    return this.usersRepository.save(user);
+  }
 
 }

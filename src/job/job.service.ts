@@ -29,23 +29,27 @@ export class JobService {
 
   /** TECHNICIAN ACCEPT JOB */
   async acceptJob(technician: User, jobId: number) {
+    if (!technician.isAvailable) {
+      throw new ForbiddenException('Technician not available');
+    }
+
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
       relations: ['technician'],
     });
 
     if (!job) throw new NotFoundException('Job not found');
-    if (job.status !== JobStatus.PENDING)
-      throw new ForbiddenException('Job not available');
 
-    if (job.technician && job.technician.id !== technician.id)
-      throw new ForbiddenException('Job already taken');
+    if (job.status !== JobStatus.PENDING) {
+      throw new ForbiddenException('Job not available');
+    }
 
     job.technician = technician;
     job.status = JobStatus.ACCEPTED;
 
     return this.jobsRepo.save(job);
   }
+
 
   /** TECHNICIAN DECLINE JOB */
   async declineJob(technician: User, jobId: number) {

@@ -80,14 +80,21 @@ export class UserService {
   }
 
   async getUserJobs(userId: number) {
-    return this.jobRepository.find({
-      where: [
-        { client: { id: userId } },
-        { technician: { id: userId } },
-      ],
-      relations: ['client', 'technician'],
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['clientJobs', 'technicianJobs'],
     });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      clientJobs: user.clientJobs,
+      technicianJobs: user.technicianJobs,
+    };
   }
+
 
 
 

@@ -92,24 +92,25 @@ export class JobService {
         order: { id: 'DESC' }
       });
     }
+  private readonly validTransitions = {
+    [JobStatus.PENDING]: [JobStatus.ACCEPTED],
+    [JobStatus.ACCEPTED]: [JobStatus.IN_PROGRESS],
+    [JobStatus.IN_PROGRESS]: [JobStatus.COMPLETED],
+    [JobStatus.COMPLETED]: [JobStatus.CLOSED],
+  };
+
   async updateJobStatus(jobId: number, newStatus: JobStatus) {
     const job = await this.jobsRepo.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException('Job not found');
 
-    const validTransitions = {
-      [JobStatus.PENDING]: [JobStatus.ACCEPTED],
-      [JobStatus.ACCEPTED]: [JobStatus.IN_PROGRESS],
-      [JobStatus.IN_PROGRESS]: [JobStatus.COMPLETED],
-      [JobStatus.COMPLETED]: [JobStatus.CLOSED],
-    };
-
-    const allowed = validTransitions[job.status];
-    if (!allowed || !allowed.includes(newStatus)) {
+    const allowed = this.validTransitions[job.status];
+    if (!allowed?.includes(newStatus)) {
       throw new ForbiddenException('Invalid job status transition');
     }
 
     job.status = newStatus;
     return this.jobsRepo.save(job);
   }
+
 
 }

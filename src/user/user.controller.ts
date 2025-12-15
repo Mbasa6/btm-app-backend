@@ -91,4 +91,9 @@ export class UserController {
     return this.userService.setUserActiveStatus(id, false);
   }
 
+  @Get(':id')
+  @Roles('admin')
+  findUserById(@Param('id', ParseIntPipe) id: number) {
+      return this.userService.findById(id)
+      }
 }

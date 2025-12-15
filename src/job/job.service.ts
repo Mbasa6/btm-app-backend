@@ -112,5 +112,44 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
+  async assignTechnician(jobId: number, technicianId: number) {
+    const job = await this.jobsRepo.findOne({ where: { id: jobId }, relations: ['technician', 'client'] });
+    if (!job) throw new NotFoundException('Job not found');
+
+    const tech = await this.userRepo.findOne({ where: { id: technicianId, role: 'technician', isActive: true } });
+    if (!tech) throw new NotFoundException('Technician not found or inactive');
+
+    job.technician = tech;
+    // If job was previously unassigned or declined, mark as assigned
+    if (job.status === JobStatus.PENDING || job.status === JobStatus.UNASSIGNED) {
+      job.status = JobStatus.ASSIGNED;
+    }
+
+    return this.jobsRepo.save(job);
+  }
+
+  async forceCloseJob(jobId: number) {
+    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Job not found');
+
+    job.status = JobStatus.CLOSED;
+    return this.jobsRepo.save(job);
+  }
+
+  async filterJobs(filters: { status?: JobStatus; technicianId?: number; clientId?: number }) {
+    const query = this.jobsRepo.createQueryBuilder('job')
+      .leftJoinAndSelect('job.client', 'client')
+      .leftJoinAndSelect('job.technician', 'technician');
+
+    if (filters.status) query.andWhere('job.status = :status', { status: filters.status });
+    if (filters.technicianId) query.andWhere('technician.id = :techId', { techId: filters.technicianId });
+    if (filters.clientId) query.andWhere('client.id = :clientId', { clientId: filters.clientId });
+
+    return query.orderBy('job.id', 'DESC').getMany();
+  }
+
+
+
+
 
 }

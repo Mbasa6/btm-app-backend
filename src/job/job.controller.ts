@@ -59,5 +59,33 @@ export class JobController {
     return this.jobService.updateJobStatus(id, dto.status);
   }
 
+  @Patch(':id/assign/:techId')
+  @Roles('admin')
+  assignTechnician(
+    @Param('id', ParseIntPipe) jobId: number,
+    @Param('techId', ParseIntPipe) techId: number,
+  ) {
+    return this.jobService.assignTechnician(jobId, techId);
+  }
+
+  @Patch(':id/close')
+  @Roles('admin')
+  forceCloseJob(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.forceCloseJob(id);
+  }
+
+  @Get('filter')
+  @Roles('admin')
+  filterJobs(
+    @Query('status') status?: JobStatus,
+    @Query('technicianId') technicianId?: number,
+    @Query('clientId') clientId?: number,
+  ) {
+    return this.jobService.filterJobs({ status, technicianId, clientId });
+  }
+
+
+
+
 
 }

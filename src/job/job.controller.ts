@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { JobService } from './job.service';
 import { CreateJobDto } from '../dto/create-job.dto';
+import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -47,5 +48,15 @@ export class JobController {
   getAllJobs() {
     return this.jobService.getAllJobs();
   }
+
+  @Put(':id/status')
+  @Roles('admin')
+  updateJobStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateJobStatusDto,
+  ) {
+    return this.jobService.updateJobStatus(id, dto.status);
+  }
+
 
 }

@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Job, JobStatus } from '../entities/job.entity';
+import { Job } from '../entities/job.entity';
+import { JobStatus } from '../job/job-status.enum';
 import { CreateJobDto } from '../dto/create-job.dto';
 import { User } from '../entities/user.entity';
 
@@ -10,45 +11,16 @@ export class JobService {
   constructor(
     @InjectRepository(Job)
     private jobsRepo: Repository<Job>,
-    @InjectRepository(User)
-    private userRepo: Repository<User>,
   ) {}
 
-  /** CREATE JOB & AUTO ASSIGN */
   async createJob(client: User, dto: CreateJobDto) {
     const job = this.jobsRepo.create({
       ...dto,
       client,
-      status: 'unassigned',
-    });
-    await this.jobsRepo.save(job);
-
-    await this.autoAssignJob(job);
-    return job;
-  }
-
-  /** AUTO-ASSIGN TO NEAREST/AVAILABLE TECH */
-  async autoAssignJob(job: Job): Promise<Job> {
-    // Fetch available technicians
-    const techs = await this.userRepo.find({
-      where: { role: 'technician', isAvailable: true },
+      status: JobStatus.PENDING,
     });
 
-    if (!techs.length) {
-      job.status = 'unassigned';
-      await this.jobsRepo.save(job);
-      return job;
-    }
-
-    // For now: assign first available (replace with nearest logic later)
-    const tech = techs[0];
-    job.technician = tech;
-    job.status = 'assigned';
-    await this.jobsRepo.save(job);
-
-    // Notify technician (pseudo)
-    this.notifyTechnician(tech, job);
-    return job;
+    return this.jobsRepo.save(job);
   }
 
   notifyTechnician(tech: User, job: Job) {
@@ -57,33 +29,35 @@ export class JobService {
 
   /** TECHNICIAN ACCEPT JOB */
   async acceptJob(technician: User, jobId: number) {
-    const job = await this.jobsRepo.findOne({ where: { id: jobId }, relations: ['technician', 'client'] });
-    if (!job) throw new NotFoundException('Job not found');
-    if (!job.technician || job.technician.id !== technician.id)
-      throw new ForbiddenException('Job not assigned to you');
-    if (job.status !== 'assigned') throw new ForbiddenException('Cannot accept this job');
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
 
-    job.status = 'accepted';
-    await this.jobsRepo.save(job);
-    return job;
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.status !== JobStatus.PENDING)
+      throw new ForbiddenException('Job not available');
+
+    if (job.technician && job.technician.id !== technician.id)
+      throw new ForbiddenException('Job already taken');
+
+    job.technician = technician;
+    job.status = JobStatus.ACCEPTED;
+
+    return this.jobsRepo.save(job);
   }
 
   /** TECHNICIAN DECLINE JOB */
   async declineJob(technician: User, jobId: number) {
-    const job = await this.jobsRepo.findOne({ where: { id: jobId }, relations: ['technician', 'client'] });
+    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException('Job not found');
-    if (!job.technician || job.technician.id !== technician.id)
-      throw new ForbiddenException('Job not assigned to you');
-    if (job.status !== 'assigned') throw new ForbiddenException('Cannot decline this job');
 
-    job.status = 'declined';
-    job.technician = null;
-    await this.jobsRepo.save(job);
+    if (job.status !== JobStatus.PENDING)
+      throw new ForbiddenException('Cannot decline');
 
-    // Auto-assign next available
-    await this.autoAssignJob(job);
-    return job;
+    return job; // no change, stays Pending
   }
+
 
   /** GET JOBS FOR USER */
   async getMyJobs(user: User) {
@@ -98,10 +72,14 @@ export class JobService {
   /** GET PENDING/ASSIGNED JOBS FOR TECH */
   async getAssignedJobs(user: User) {
     return this.jobsRepo.find({
-      where: { technician: { id: user.id }, status: 'assigned' },
+      where: [
+        { status: JobStatus.PENDING },
+        { technician: { id: user.id } },
+      ],
       relations: ['technician', 'client'],
     });
   }
+
 
   /** ADMIN: GET ALL JOBS */
     async getAllJobs() {
@@ -110,4 +88,24 @@ export class JobService {
         order: { id: 'DESC' }
       });
     }
+  async updateJobStatus(jobId: number, newStatus: JobStatus) {
+    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Job not found');
+
+    const validTransitions = {
+      [JobStatus.PENDING]: [JobStatus.ACCEPTED],
+      [JobStatus.ACCEPTED]: [JobStatus.IN_PROGRESS],
+      [JobStatus.IN_PROGRESS]: [JobStatus.COMPLETED],
+      [JobStatus.COMPLETED]: [JobStatus.CLOSED],
+    };
+
+    const allowed = validTransitions[job.status];
+    if (!allowed || !allowed.includes(newStatus)) {
+      throw new ForbiddenException('Invalid job status transition');
+    }
+
+    job.status = newStatus;
+    return this.jobsRepo.save(job);
+  }
+
 }

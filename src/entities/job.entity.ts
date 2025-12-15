@@ -1,8 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
 import { User } from './user.entity';
-
-export type JobStatus = | 'unassigned' | 'assigned' | 'accepted' | 'declined' | 'in-progress' | 'completed';
-
+import { JobStatus } from '../job/job-status.enum';
 
 @Entity()
 export class Job {
@@ -17,8 +15,8 @@ export class Job {
 
   @Column({
     type: 'enum',
-    enum: ['unassigned', 'assigned', 'accepted', 'declined', 'in-progress', 'completed'],
-    default: 'unassigned',
+    enum: JobStatus,
+    default: JobStatus.PENDING,
   })
   status: JobStatus;
 

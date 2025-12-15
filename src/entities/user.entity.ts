@@ -35,4 +35,8 @@ export class User {
   @Column({ default: true })
   isAvailable: boolean;
 
+  @Column({ default: true })
+  isActive: boolean;
+
+
 }

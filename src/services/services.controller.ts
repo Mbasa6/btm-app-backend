@@ -2,10 +2,11 @@ import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards } from '@ne
 import { ServicesService } from './services.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { IsActiveGuard } from '../auth/is-active.guard';
 import { Roles } from '../auth/roles.decorator';
 
 @Controller('service-categories')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, IsActiveGuard)
 export class ServicesController {
   constructor(private servicesService: ServicesService) {}
 

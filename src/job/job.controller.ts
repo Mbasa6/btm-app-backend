@@ -4,12 +4,13 @@ import { CreateJobDto } from '../dto/create-job.dto';
 import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { IsActiveGuard } from '../auth/is-active.guard';
 import { Roles } from '../auth/roles.decorator';
 import { GetUser } from '../auth/get-user.decorator';
 import { User } from '../entities/user.entity';
 
 @Controller('jobs')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, IsActiveGuard)
 export class JobController {
   constructor(private jobService: JobService) {}
 

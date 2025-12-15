@@ -1,13 +1,18 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+// src/auth/is-active.guard.ts
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class IsActiveGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(private userService: UserService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    if (!user?.isActive) {
-      throw new ForbiddenException('Account is deactivated');
+    const freshUser = await this.userService.findById(user.id);
+    if (!freshUser.isActive) {
+      throw new ForbiddenException('User is deactivated');
     }
 
     return true;

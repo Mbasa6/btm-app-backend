@@ -1,6 +1,19 @@
-import { Controller, Post, Get, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe
+} from '@nestjs/common';
+
 import { JobService } from './job.service';
 import { CreateJobDto } from '../dto/create-job.dto';
+import { JobStatus } from '../job/job-status.enum';
 import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';

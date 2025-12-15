@@ -2,15 +2,17 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job } from '../entities/job.entity';
+import { User } from '../entities/user.entity';
 import { JobStatus } from '../job/job-status.enum';
 import { CreateJobDto } from '../dto/create-job.dto';
-import { User } from '../entities/user.entity';
 
 @Injectable()
 export class JobService {
   constructor(
     @InjectRepository(Job)
     private jobsRepo: Repository<Job>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
   ) {}
 
   async createJob(client: User, dto: CreateJobDto) {
@@ -121,8 +123,8 @@ export class JobService {
 
     job.technician = tech;
     // If job was previously unassigned or declined, mark as assigned
-    if (job.status === JobStatus.PENDING || job.status === JobStatus.UNASSIGNED) {
-      job.status = JobStatus.ASSIGNED;
+    if (job.status === JobStatus.PENDING) {
+      job.status = JobStatus.ACCEPTED;
     }
 
     return this.jobsRepo.save(job);

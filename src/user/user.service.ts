@@ -1,9 +1,10 @@
 // src/user/user.service.ts (Hypothetical file)
 
-import { Injectable } from '@nestjs/common';
+import { Injectable,NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity'; // Your User entity
+import { UserRole } from '../entities/user.entity';
 
 @Injectable()
 export class UserService {
@@ -27,6 +28,20 @@ export class UserService {
       },
     });
   }
+
+  getAllClients(): Promise<User[]> {
+      return this.usersRepository.find({
+        where: {
+          role: 'client', // Filter by the 'technician' role
+          // Optionally add a status check, e.g., isActive: true
+        },
+        // Select only necessary fields for the admin list (Name, Email, Status)
+        select: ['id', 'fullName', 'email', 'role'],
+        order: {
+          fullName: 'ASC',
+        },
+      });
+    }
 
   getAllUsers(): Promise<User[]> {
       return this.usersRepository.find({
@@ -102,5 +117,11 @@ export class UserService {
     user.isActive = isActive;
     return this.usersRepository.save(user);
   }
+
+   async findById(id: number): Promise<User> {
+      const user = await this.usersRepository.findOne({ where: { id } });
+      if (!user) throw new NotFoundException('User not found');
+      return user;
+    }
 
 }

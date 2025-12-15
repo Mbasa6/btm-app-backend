@@ -1,8 +1,24 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { UpdateUserRoleDto } from '../dto/update-user-role.dto';
+import { UpdateAvailabilityDto } from '../dto/update-availability.dto';
+import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
+import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
+
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,6 +30,12 @@ export class UserController {
   getAllTechnicians() {
     return this.userService.getAllTechnicians();
   }
+
+  @Get('clients')
+    @Roles('admin')
+    getAllClients() {
+      return this.userService.getAllClients();
+    }
 
   @Get() // <--- The root path /users
   @Roles('admin') // Only users with the 'admin' role can access this

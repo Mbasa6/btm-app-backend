@@ -20,4 +20,43 @@ export class UserController {
   getAllUsers() {
     return this.userService.getAllUsers();
   }
+
+  @Put(':id/status')
+  @Roles('admin')
+  updateUserStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.userService.updateUserStatus(id, dto.isActive);
+  }
+
+  @Put(':id/role')
+  @Roles('admin')
+  updateUserRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserRoleDto,
+  ) {
+    return this.userService.updateUserRole(id, dto.role);
+  }
+
+  @Put(':id/availability')
+  @Roles('admin')
+  updateAvailability(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAvailabilityDto,
+  ) {
+    return this.userService.updateTechnicianAvailability(
+      id,
+      dto.isAvailable,
+    );
+  }
+
+  @Get(':id/jobs')
+  @Roles('admin')
+  getUserJobs(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.getUserJobs(id);
+  }
+
+
+
 }

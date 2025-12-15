@@ -38,4 +38,58 @@ export class UserService {
         },
       });
     }
+
+  async updateUserStatus(userId: number, isActive: boolean): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    user.isActive = isActive;
+    return this.usersRepository.save(user);
+  }
+
+  async updateUserRole(userId: number, role: UserRole): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    user.role = role;
+    return this.usersRepository.save(user);
+  }
+
+  async updateTechnicianAvailability(
+    userId: number,
+    isAvailable: boolean,
+  ): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (user.role !== 'technician') {
+      throw new Error('User is not a technician');
+    }
+
+    user.isAvailable = isAvailable;
+    return this.usersRepository.save(user);
+  }
+
+  async getUserJobs(userId: number) {
+    return this.jobRepository.find({
+      where: [
+        { client: { id: userId } },
+        { technician: { id: userId } },
+      ],
+      relations: ['client', 'technician'],
+    });
+  }
+
+
+
+
 }

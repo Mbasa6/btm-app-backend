@@ -18,12 +18,13 @@ import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { IsActiveGuard } from '../auth/is-active.guard';
+import { ApprovalGuard } from '../auth/approval.guard';
 import { Roles } from '../auth/roles.decorator';
 import { GetUser } from '../auth/get-user.decorator';
 import { User } from '../entities/user.entity';
 
 @Controller('jobs')
-@UseGuards(JwtAuthGuard, RolesGuard, IsActiveGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, IsActiveGuard, ApprovalGuard)
 export class JobController {
   constructor(private jobService: JobService) {}
 
@@ -64,7 +65,7 @@ export class JobController {
   }
 
   @Put(':id/status')
-  @Roles('admin')
+  @Roles('admin', 'technician')
   updateJobStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateJobStatusDto,
@@ -97,6 +98,11 @@ export class JobController {
     return this.jobService.filterJobs({ status, technicianId, clientId });
   }
 
+  @Get(':id')
+  @Roles('admin', 'client', 'technician')
+  getJobById(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.getJobById(id);
+  }
 
 
 

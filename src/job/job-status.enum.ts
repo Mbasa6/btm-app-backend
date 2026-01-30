@@ -1,7 +1,8 @@
 export enum JobStatus {
-  PENDING = 'Pending',
-  ACCEPTED = 'Accepted',
-  IN_PROGRESS = 'In Progress',
-  COMPLETED = 'Completed',
-  CLOSED = 'Closed',
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CLOSED = 'closed',
 }
+

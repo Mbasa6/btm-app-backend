@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, CreateDateColumn, ManyToMany, JoinTable, JoinColumn } from 'typeorm';
 import { User } from './user.entity';
 import { JobStatus } from '../job/job-status.enum';
+import { Payment } from '../payment/payment.entity'
 
 @Entity()
 export class Job {
@@ -31,4 +32,13 @@ export class Job {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @ManyToMany(() => User)
+  @JoinTable()
+  declinedBy: User[];
+
+  @OneToOne(() => Payment, (payment) => payment.job, { nullable: true })
+  @JoinColumn()
+  payment: Payment;
+
 }

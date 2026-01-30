@@ -5,6 +5,7 @@ import { Job } from '../entities/job.entity';
 import { User } from '../entities/user.entity';
 import { JobStatus } from '../job/job-status.enum';
 import { CreateJobDto } from '../dto/create-job.dto';
+import { PaymentStatus } from '../payment/payment-status.enum';
 
 @Injectable()
 export class JobService {
@@ -31,13 +32,17 @@ export class JobService {
 
   /** TECHNICIAN ACCEPT JOB */
   async acceptJob(technician: User, jobId: number) {
-    if (!technician.isAvailable) {
+    const freshTech = await this.userRepo.findOne({
+      where: { id: technician.id },
+    });
+
+    if (!freshTech || !freshTech.isAvailable) {
       throw new ForbiddenException('Technician not available');
     }
 
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['technician'],
+      relations: ['technician', 'payment'],
     });
 
     if (!job) throw new NotFoundException('Job not found');
@@ -46,23 +51,43 @@ export class JobService {
       throw new ForbiddenException('Job not available');
     }
 
-    job.technician = technician;
+    // 🔐 PAYMENT GATE
+    if (!job.payment || job.payment.status !== PaymentStatus.PAID) {
+      throw new ForbiddenException('Job not dispatchable');
+    }
+
+    job.technician = freshTech;
     job.status = JobStatus.ACCEPTED;
 
     return this.jobsRepo.save(job);
   }
 
 
+
+
   /** TECHNICIAN DECLINE JOB */
   async declineJob(technician: User, jobId: number) {
-    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
-    if (!job) throw new NotFoundException('Job not found');
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician', 'declinedBy'],
+    });
 
+    if (!job) throw new NotFoundException('Job not found');
     if (job.status !== JobStatus.PENDING)
       throw new ForbiddenException('Cannot decline');
 
-    return job; // no change, stays Pending
+    // Add this technician to the declined list
+    if (!job.declinedBy) job.declinedBy = [];
+    job.declinedBy.push(technician);
+
+    // Remove technician assignment if needed
+    if (job.technician?.id === technician.id) {
+      job.technician = null;
+    }
+
+    return this.jobsRepo.save(job);
   }
+
 
 
   /** GET JOBS FOR USER */
@@ -76,16 +101,19 @@ export class JobService {
   }
 
   /** GET PENDING/ASSIGNED JOBS FOR TECH */
-  async getAssignedJobs(user: User) {
-    return this.jobsRepo.find({
-      where: [
-        { status: JobStatus.PENDING },
-        { technician: { id: user.id } },
-      ],
-      relations: ['technician', 'client'],
-    });
+  async getAssignedJobs(technician: User) {
+    return this.jobsRepo.createQueryBuilder('job')
+      .leftJoinAndSelect('job.client', 'client')
+      .leftJoinAndSelect('job.payment', 'payment')
+      .leftJoinAndSelect('job.declinedBy', 'declinedBy')
+      .where('job.status = :status', { status: JobStatus.PENDING })
+      .andWhere('payment.status = :paid', { paid: PaymentStatus.PAID })
+      .andWhere(
+        ':techId NOT IN (SELECT userId FROM job_declined_by_user WHERE jobId = job.id)',
+        { techId: technician.id },
+      )
+      .getMany();
   }
-
 
   /** ADMIN: GET ALL JOBS */
     async getAllJobs() {
@@ -150,8 +178,17 @@ export class JobService {
     return query.orderBy('job.id', 'DESC').getMany();
   }
 
+  async getJobById(jobId: number) {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['client', 'technician'],
+    });
 
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
 
-
+    return job;
+  }
 
 }

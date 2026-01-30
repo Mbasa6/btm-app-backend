@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JobModule } from './job/job.module';
 import { ServicesModule } from './services/services.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ServicesModule } from './services/services.module';
     AuthModule,
     JobModule,
     ServicesModule,
+    PaymentModule
   ],
    controllers: [AppController], // 👈 Make sure this line exists
    providers: [AppService],

@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity'; // Your User entity
 import { UserRole } from '../entities/user.entity';
+import { UpdateUserStatusDto } from '../dto/update-user-status.dto'
 
 @Injectable()
 export class UserService {
@@ -12,8 +13,6 @@ export class UserService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}
-
-  // ... (existing user methods like findOne, create, etc.)
 
   getAllTechnicians(): Promise<User[]> {
     return this.usersRepository.find({
@@ -47,7 +46,7 @@ export class UserService {
       return this.usersRepository.find({
         // No 'where' clause needed to get all users
         // Select only necessary fields for the admin list
-        select: ['id', 'fullName', 'email', 'role', 'isAvailable'],
+        select: ['id', 'fullName', 'email', 'role', 'isAvailable', 'approvalStatus'],
         order: {
           id: 'ASC',
         },
@@ -123,5 +122,23 @@ export class UserService {
       if (!user) throw new NotFoundException('User not found');
       return user;
     }
+
+   // user.service.ts
+   async updateUserApprovalStatus(
+     userId: number,
+     dto: UpdateUserStatusDto,
+   ) {
+     const user = await this.usersRepository.findOne({ where: { id: userId } });
+     if (!user) throw new NotFoundException('User not found');
+
+     user.approvalStatus = dto.approvalStatus;
+
+     if (dto.isActive !== undefined) {
+       user.isActive = dto.isActive;
+     }
+
+     return this.usersRepository.save(user);
+   }
+
 
 }

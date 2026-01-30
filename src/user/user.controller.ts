@@ -96,4 +96,15 @@ export class UserController {
   findUserById(@Param('id', ParseIntPipe) id: number) {
       return this.userService.findById(id)
       }
+
+  // user.controller.ts
+  @Put(':id/approvalStatus')
+  @Roles('admin')
+  updateUserApprovalStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.userService.updateUserApprovalStatus(id, dto);
+  }
+
 }

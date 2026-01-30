@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
 import { Job } from './job.entity';
+import { ApprovalStatus } from '../user/approval-status.enum';
 
 export type UserRole = 'client' | 'technician' | 'admin';
 
@@ -33,10 +34,10 @@ export class User {
   @Column({ nullable: true })
   longitude?: number;
 
-  @Column({ default: true })
+  @Column({ default: false })
   isAvailable: boolean;
 
-  @Column({ default: true })
+  @Column({ default: false })
   isActive: boolean;
 
   // 🔗 CLIENT JOBS
@@ -46,4 +47,12 @@ export class User {
   // 🔗 TECHNICIAN JOBS
   @OneToMany(() => Job, (job) => job.technician)
   technicianJobs: Job[];
+
+  @Column({
+    type: 'enum',
+    enum: ApprovalStatus,
+    default: ApprovalStatus.PENDING,
+  })
+  approvalStatus: ApprovalStatus;
+
 }

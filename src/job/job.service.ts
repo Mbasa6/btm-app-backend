@@ -181,14 +181,21 @@ export class JobService {
   async getJobById(jobId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['client', 'technician'],
+      relations: ['client', 'technician', 'payment'],
     });
+
+    console.log('DEBUG: job fetched:', job);
+    console.log('DEBUG: payment fetched:', job?.payment);
+    console.log('DEBUG: status fetched:', job?.payment.status);
 
     if (!job) {
       throw new NotFoundException('Job not found');
     }
 
-    return job;
+    return{
+      ...job,
+      paymentStatus: job.payment?.status ?? null,
+      }
   }
 
 }

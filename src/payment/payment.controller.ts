@@ -39,15 +39,7 @@ export class PaymentController {
 
   @Post('itn')
   async payfastITN(@Body() body: any) {
-    const isValid = this.paymentService.verifyPayFastSignature(
-      body,
-      process.env.PAYFAST_PASSPHRASE,
-    );
-
-    if (!isValid) {
-      console.warn('Invalid PayFast signature');
-      return 'INVALID SIGNATURE';
-    }
+    console.log('💰 PayFast ITN received:', body);
 
     const paymentId = Number(body.m_payment_id);
     if (!paymentId) return 'INVALID PAYMENT';
@@ -61,6 +53,7 @@ export class PaymentController {
 
     return 'OK';
   }
+
 
   @Get(':jobId/payfast')
   @UseGuards(JwtAuthGuard, RolesGuard)

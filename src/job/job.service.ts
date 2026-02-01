@@ -93,7 +93,7 @@ export class JobService {
   /** GET JOBS FOR USER */
   async getMyJobs(user: User) {
     if (user.role === 'client') {
-      return this.jobsRepo.find({ where: { client: { id: user.id } }, relations: ['technician', 'client'] });
+      return this.jobsRepo.find({ where: { client: { id: user.id } }, relations: ['technician', 'client', 'payment'] });
     } else if (user.role === 'technician') {
       return this.jobsRepo.find({ where: { technician: { id: user.id } }, relations: ['technician', 'client'] });
     }

@@ -23,11 +23,19 @@ export class AuthService {
 
     const hashed = await bcrypt.hash(password, 10);
 
-    const user = this.usersRepo.create({ email, password: hashed, fullName, role });
+    const user = this.usersRepo.create({
+      email,
+      password: hashed,
+      fullName,
+      role,
+      isActive: role === 'admin' ? true : false, // ✅ Admins start active
+    });
+
     await this.usersRepo.save(user);
 
     return { message: 'User registered successfully' };
   }
+
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
@@ -43,7 +51,8 @@ export class AuthService {
 
     return {
         access_token: token,
-         role: user.role
+         role: user.role,
+         userId: user.id,
          };
   }
 }

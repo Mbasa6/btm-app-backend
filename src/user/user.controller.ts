@@ -62,7 +62,7 @@ export class UserController {
   }
 
   @Put(':id/availability')
-  @Roles('admin')
+  @Roles('admin', 'technician')
   updateAvailability(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAvailabilityDto,

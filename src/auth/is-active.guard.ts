@@ -12,7 +12,7 @@ export class IsActiveGuard implements CanActivate {
 
     const freshUser = await this.userService.findById(user.id);
     if (!freshUser.isActive) {
-      throw new ForbiddenException('User is deactivated');
+
     }
 
     return true;

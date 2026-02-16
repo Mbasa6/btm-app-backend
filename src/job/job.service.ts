@@ -6,6 +6,7 @@ import { User } from '../entities/user.entity';
 import { JobStatus } from '../job/job-status.enum';
 import { CreateJobDto } from '../dto/create-job.dto';
 import { PaymentStatus } from '../payment/payment-status.enum';
+import { ServiceItem } from '../entities/service-item.entity';
 
 @Injectable()
 export class JobService {
@@ -14,17 +15,26 @@ export class JobService {
     private jobsRepo: Repository<Job>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(ServiceItem)
+    private serviceItemRepo: Repository<ServiceItem>,
   ) {}
 
   async createJob(client: User, dto: CreateJobDto) {
+    const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
+    if (!serviceItem) {
+      throw new NotFoundException('Service item not found');
+    }
+
     const job = this.jobsRepo.create({
       ...dto,
       client,
       status: JobStatus.PENDING,
+      serviceItem,  // now properly linked
     });
 
     return this.jobsRepo.save(job);
   }
+
 
   notifyTechnician(tech: User, job: Job) {
     console.log(`Notify ${tech.fullName} about job ${job.id}`);

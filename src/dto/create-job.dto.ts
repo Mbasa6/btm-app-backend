@@ -8,4 +8,7 @@ export class CreateJobDto {
   @IsNotEmpty()
   @IsString()
   description: string;
+
+  @IsNotEmpty()
+  serviceItemId: number;
 }

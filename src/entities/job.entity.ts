@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, CreateDate
 import { User } from './user.entity';
 import { JobStatus } from '../job/job-status.enum';
 import { Payment } from '../payment/payment.entity'
+import { ServiceItem } from './service-item.entity';
 
 @Entity()
 export class Job {
@@ -40,5 +41,9 @@ export class Job {
   @OneToOne(() => Payment, (payment) => payment.job, { nullable: true })
   @JoinColumn()
   payment: Payment;
+
+  @ManyToOne(() => ServiceItem, { nullable: true, eager: true, onDelete: 'SET NULL' })
+  serviceItem: ServiceItem | null;
+
 
 }

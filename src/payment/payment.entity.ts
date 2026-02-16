@@ -27,7 +27,7 @@ export class Payment {
   status: PaymentStatus;
 
   @Column({ nullable: true })
-  providerRef: string; // PayFast / Stripe reference
+  providerRef: string;
 
   @CreateDateColumn()
   createdAt: Date;

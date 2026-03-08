@@ -8,17 +8,19 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseIntPipe
+  ParseIntPipe,
+  ParseFloatPipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { GetUser } from '../auth/get-user.decorator';
+import { User } from '../entities/user.entity';
 import { UpdateUserRoleDto } from '../dto/update-user-role.dto';
 import { UpdateAvailabilityDto } from '../dto/update-availability.dto';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
-import { UpdateJobStatusDto } from '../dto/update-job-status.dto';
-
+import { UpdateLocationDto } from '../dto/update-location.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,13 +34,13 @@ export class UserController {
   }
 
   @Get('clients')
-    @Roles('admin')
-    getAllClients() {
-      return this.userService.getAllClients();
-    }
+  @Roles('admin')
+  getAllClients() {
+    return this.userService.getAllClients();
+  }
 
-  @Get() // <--- The root path /users
-  @Roles('admin') // Only users with the 'admin' role can access this
+  @Get()
+  @Roles('admin')
   getAllUsers() {
     return this.userService.getAllUsers();
   }
@@ -67,10 +69,7 @@ export class UserController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAvailabilityDto,
   ) {
-    return this.userService.updateTechnicianAvailability(
-      id,
-      dto.isAvailable,
-    );
+    return this.userService.updateTechnicianAvailability(id, dto.isAvailable);
   }
 
   @Get(':id/jobs')
@@ -91,13 +90,6 @@ export class UserController {
     return this.userService.setUserActiveStatus(id, false);
   }
 
-  @Get(':id')
-  @Roles('admin')
-  findUserById(@Param('id', ParseIntPipe) id: number) {
-      return this.userService.findById(id)
-      }
-
-  // user.controller.ts
   @Put(':id/approvalStatus')
   @Roles('admin')
   updateUserApprovalStatus(
@@ -107,4 +99,40 @@ export class UserController {
     return this.userService.updateUserApprovalStatus(id, dto);
   }
 
+  // ─── LOCATION ENDPOINTS ───────────────────────────────────────────────────
+
+  /**
+   * PATCH /users/me/location
+   * Technician sends their current GPS coordinates.
+   * Called on login or when they toggle availability ON.
+   */
+  @Patch('me/location')
+  @Roles('technician')
+  updateMyLocation(
+    @GetUser() user: User,
+    @Body() dto: UpdateLocationDto,
+  ) {
+    return this.userService.updateLocation(user.id, dto);
+  }
+
+  /**
+   * GET /users/nearest-technicians?lat=XX&lng=YY&limit=5
+   * Returns available technicians sorted by distance from given coordinates.
+   * Used by admin when assigning a job.
+   */
+  @Get('nearest-technicians')
+  @Roles('admin', 'client')
+  getNearestTechnicians(
+    @Query('lat', ParseFloatPipe) lat: number,
+    @Query('lng', ParseFloatPipe) lng: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.userService.getNearestTechnicians(lat, lng, limit ? Number(limit) : 5);
+  }
+
+  @Get(':id')
+  @Roles('admin')
+  findUserById(@Param('id', ParseIntPipe) id: number) {
+    return this.userService.findById(id);
+  }
 }

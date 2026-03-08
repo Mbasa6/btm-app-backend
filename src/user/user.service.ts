@@ -1,11 +1,10 @@
-// src/user/user.service.ts (Hypothetical file)
-
-import { Injectable,NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity'; // Your User entity
+import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user.entity';
-import { UpdateUserStatusDto } from '../dto/update-user-status.dto'
+import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
+import { UpdateLocationDto } from '../dto/update-location.dto';
 
 @Injectable()
 export class UserService {
@@ -16,79 +15,45 @@ export class UserService {
 
   getAllTechnicians(): Promise<User[]> {
     return this.usersRepository.find({
-      where: {
-        role: 'technician', // Filter by the 'technician' role
-        // Optionally add a status check, e.g., isActive: true
-      },
-      // Select only necessary fields for the admin list (Name, Email, Status)
+      where: { role: 'technician' },
       select: ['id', 'fullName', 'email', 'isAvailable', 'role'],
-      order: {
-        fullName: 'ASC',
-      },
+      order: { fullName: 'ASC' },
     });
   }
 
   getAllClients(): Promise<User[]> {
-      return this.usersRepository.find({
-        where: {
-          role: 'client', // Filter by the 'technician' role
-          // Optionally add a status check, e.g., isActive: true
-        },
-        // Select only necessary fields for the admin list (Name, Email, Status)
-        select: ['id', 'fullName', 'email', 'role'],
-        order: {
-          fullName: 'ASC',
-        },
-      });
-    }
+    return this.usersRepository.find({
+      where: { role: 'client' },
+      select: ['id', 'fullName', 'email', 'role'],
+      order: { fullName: 'ASC' },
+    });
+  }
 
   getAllUsers(): Promise<User[]> {
-      return this.usersRepository.find({
-        // No 'where' clause needed to get all users
-        // Select only necessary fields for the admin list
-        select: ['id', 'fullName', 'email', 'role', 'isAvailable', 'approvalStatus'],
-        order: {
-          id: 'ASC',
-        },
-      });
-    }
+    return this.usersRepository.find({
+      select: ['id', 'fullName', 'email', 'role', 'isAvailable', 'approvalStatus'],
+      order: { id: 'ASC' },
+    });
+  }
 
   async updateUserStatus(userId: number, isActive: boolean): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
+    if (!user) throw new NotFoundException('User not found');
     user.isActive = isActive;
     return this.usersRepository.save(user);
   }
 
   async updateUserRole(userId: number, role: UserRole): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
+    if (!user) throw new NotFoundException('User not found');
     user.role = role;
     return this.usersRepository.save(user);
   }
 
-  async updateTechnicianAvailability(
-    userId: number,
-    isAvailable: boolean,
-  ): Promise<User> {
+  async updateTechnicianAvailability(userId: number, isAvailable: boolean): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    if (user.role !== 'technician') {
-      throw new Error('User is not a technician');
-    }
-
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role !== 'technician') throw new ForbiddenException('User is not a technician');
     user.isAvailable = isAvailable;
     return this.usersRepository.save(user);
   }
@@ -98,47 +63,104 @@ export class UserService {
       where: { id: userId },
       relations: ['clientJobs', 'technicianJobs'],
     });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return {
-      clientJobs: user.clientJobs,
-      technicianJobs: user.technicianJobs,
-    };
+    if (!user) throw new NotFoundException('User not found');
+    return { clientJobs: user.clientJobs, technicianJobs: user.technicianJobs };
   }
 
   async setUserActiveStatus(userId: number, isActive: boolean) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-
     user.isActive = isActive;
     return this.usersRepository.save(user);
   }
 
-   async findById(id: number): Promise<User> {
-      const user = await this.usersRepository.findOne({ where: { id } });
-      if (!user) throw new NotFoundException('User not found');
-      return user;
-    }
+  async findById(id: number): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
 
-   // user.service.ts
-   async updateUserApprovalStatus(
-     userId: number,
-     dto: UpdateUserStatusDto,
-   ) {
-     const user = await this.usersRepository.findOne({ where: { id: userId } });
-     if (!user) throw new NotFoundException('User not found');
+  async updateUserApprovalStatus(userId: number, dto: UpdateUserStatusDto) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.approvalStatus = dto.approvalStatus;
+    if (dto.isActive !== undefined) user.isActive = dto.isActive;
+    return this.usersRepository.save(user);
+  }
 
-     user.approvalStatus = dto.approvalStatus;
+  // ─── LOCATION FEATURES ────────────────────────────────────────────────────
 
-     if (dto.isActive !== undefined) {
-       user.isActive = dto.isActive;
-     }
+  /**
+   * Called by a technician to save their current GPS coordinates.
+   */
+  async updateLocation(userId: number, dto: UpdateLocationDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role !== 'technician') throw new ForbiddenException('Only technicians can update location');
 
-     return this.usersRepository.save(user);
-   }
+    user.latitude = dto.latitude;
+    user.longitude = dto.longitude;
+    await this.usersRepository.save(user);
 
+    return { message: 'Location updated successfully' };
+  }
 
+  /**
+   * Given a client's coordinates, returns available technicians
+   * sorted by distance (nearest first) using the Haversine formula.
+   */
+  async getNearestTechnicians(
+    clientLat: number,
+    clientLng: number,
+    limitCount = 5,
+  ): Promise<Array<{ id: number; fullName: string; email: string; distanceKm: number; isAvailable: boolean }>> {
+    const technicians = await this.usersRepository.find({
+      where: { role: 'technician', isActive: true, isAvailable: true },
+      select: ['id', 'fullName', 'email', 'latitude', 'longitude', 'isAvailable'],
+    });
+
+    // Filter out techs with no location set
+    const techsWithLocation = technicians.filter(
+      (t) => t.latitude != null && t.longitude != null,
+    );
+
+    // Calculate distance using Haversine formula
+    // Note: TypeORM returns decimal columns as strings from MySQL, so we parse them
+    const withDistance = techsWithLocation.map((tech) => ({
+      id: tech.id,
+      fullName: tech.fullName,
+      email: tech.email,
+      isAvailable: tech.isAvailable,
+      distanceKm: this.haversineKm(clientLat, clientLng, parseFloat(tech.latitude as any), parseFloat(tech.longitude as any)),
+    }));
+
+    // Sort nearest first, return top N
+    return withDistance
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limitCount);
+  }
+
+  /**
+   * Haversine formula — calculates great-circle distance between two
+   * lat/lng points in kilometres.
+   */
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Earth radius in km
+    const dLat = this.toRad(lat2 - lat1);
+    const dLng = this.toRad(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) *
+        Math.cos(this.toRad(lat2)) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10; // rounded to 1 decimal place
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
+  }
 }

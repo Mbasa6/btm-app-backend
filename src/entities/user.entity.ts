@@ -28,10 +28,10 @@ export class User {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   latitude?: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   longitude?: number;
 
   @Column({ default: false })

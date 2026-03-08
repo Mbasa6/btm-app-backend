@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateJobDto {
   @IsNotEmpty()
@@ -11,4 +11,13 @@ export class CreateJobDto {
 
   @IsNotEmpty()
   serviceItemId: number;
+
+  // Client's GPS at time of booking — sent from the Expo app
+  @IsOptional()
+  @IsNumber()
+  clientLatitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  clientLongitude?: number;
 }

@@ -12,7 +12,13 @@ export class CreateJobDto {
   @IsNotEmpty()
   serviceItemId: number;
 
-  // Client's GPS at time of booking — sent from the Expo app
+
+  @IsNotEmpty()
+  @IsString()
+  address: string;
+
+  // GPS coordinates — now fully optional, kept for backwards compat only.
+  // getAssignedJobs will still use them for proximity filtering if present.
   @IsOptional()
   @IsNumber()
   clientLatitude?: number;

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Job } from '../entities/job.entity';
@@ -7,6 +12,7 @@ import { JobStatus } from '../job/job-status.enum';
 import { CreateJobDto } from '../dto/create-job.dto';
 import { PaymentStatus } from '../payment/payment-status.enum';
 import { ServiceItem } from '../entities/service-item.entity';
+import { RateJobDto } from '../dto/rate-job.dto';
 
 // Max distance in km a technician will see jobs from their location
 const JOB_RADIUS_KM = 20;
@@ -22,7 +28,10 @@ export class JobService {
     private serviceItemRepo: Repository<ServiceItem>,
   ) {}
 
-  async createJob(client: User, dto: CreateJobDto) {
+  // ─── CREATE JOB ─────────────────────────────────────────────────────────
+  // Now accepts a plain text `address` typed by the user (no GPS needed).
+  // `beforeImages` are file paths saved by the controller after multer upload.
+  async createJob(client: User, dto: CreateJobDto, beforeImagePaths: string[] = []) {
     const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
     if (!serviceItem) throw new NotFoundException('Service item not found');
 
@@ -31,8 +40,12 @@ export class JobService {
       client,
       status: JobStatus.PENDING,
       serviceItem,
+      // Address is now plain text from the user — clientLatitude/Longitude
+      // are kept for backwards compatibility but no longer required
       clientLatitude: dto.clientLatitude ?? null,
       clientLongitude: dto.clientLongitude ?? null,
+      beforeImages: beforeImagePaths,
+      afterImages: null as any,
     });
 
     return this.jobsRepo.save(job);
@@ -42,7 +55,7 @@ export class JobService {
     console.log(`Notify ${tech.fullName} about job ${job.id}`);
   }
 
-  /** TECHNICIAN ACCEPT JOB */
+  // ─── TECHNICIAN ACCEPT JOB ───────────────────────────────────────────────
   async acceptJob(technician: User, jobId: number) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
 
@@ -69,7 +82,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  /** TECHNICIAN DECLINE JOB */
+  // ─── TECHNICIAN DECLINE JOB ──────────────────────────────────────────────
   async declineJob(technician: User, jobId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
@@ -89,7 +102,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  /** GET JOBS FOR USER */
+  // ─── GET JOBS FOR USER ───────────────────────────────────────────────────
   async getMyJobs(user: User) {
     if (user.role === 'client') {
       return this.jobsRepo.find({
@@ -110,13 +123,12 @@ export class JobService {
    *
    * Flow:
    * 1. Fetch all paid+pending jobs the technician hasn't declined
-   * 2. If the technician has a saved location AND the job has a client location,
-   *    only return jobs within JOB_RADIUS_KM (default 20km)
+   * 2. If the job has a clientLatitude/clientLongitude (set via geocoding or legacy GPS),
+   *    filter to jobs within JOB_RADIUS_KM (default 20km)
    * 3. If either side has no coordinates, fall back to showing the job anyway
    *    (so no jobs are silently lost due to missing location data)
    */
   async getAssignedJobs(technician: User) {
-    // Get fresh technician record with location
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
     if (!freshTech) throw new NotFoundException('Technician not found');
 
@@ -142,7 +154,6 @@ export class JobService {
     // Filter by radius and attach distance
     const nearbyJobs = jobs
       .map(job => {
-        // If job has no client location, include it but mark distance as unknown
         if (job.clientLatitude == null || job.clientLongitude == null) {
           return { ...job, distanceKm: null };
         }
@@ -158,7 +169,6 @@ export class JobService {
       })
       .filter(job => job.distanceKm === null || job.distanceKm <= JOB_RADIUS_KM)
       .sort((a, b) => {
-        // Jobs with known distance come first, sorted nearest → furthest
         if (a.distanceKm === null) return 1;
         if (b.distanceKm === null) return -1;
         return a.distanceKm - b.distanceKm;
@@ -167,7 +177,7 @@ export class JobService {
     return nearbyJobs;
   }
 
-  /** ADMIN: GET ALL JOBS */
+  // ─── ADMIN: GET ALL JOBS ─────────────────────────────────────────────────
   async getAllJobs() {
     return this.jobsRepo.find({
       relations: ['client', 'technician'],
@@ -175,6 +185,7 @@ export class JobService {
     });
   }
 
+  // ─── STATUS TRANSITION ───────────────────────────────────────────────────
   private readonly validTransitions = {
     [JobStatus.PENDING]: [JobStatus.ACCEPTED],
     [JobStatus.ACCEPTED]: [JobStatus.IN_PROGRESS],
@@ -195,6 +206,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
+  // ─── ADMIN: ASSIGN TECHNICIAN ────────────────────────────────────────────
   async assignTechnician(jobId: number, technicianId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
@@ -247,8 +259,49 @@ export class JobService {
     };
   }
 
-  // ─── HAVERSINE HELPER ────────────────────────────────────────────────────
+  // ─── NEW: TECHNICIAN UPLOADS AFTER IMAGES ────────────────────────────────
+  async addAfterImages(jobId: number, afterImagePaths: string[], technician: User): Promise<Job> {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
 
+    if (job.technician?.id !== technician.id) {
+      throw new ForbiddenException('Only the assigned technician can upload after photos.');
+    }
+    if (job.status !== JobStatus.IN_PROGRESS) {
+      throw new BadRequestException('Job must be in progress to upload after photos.');
+    }
+
+    job.afterImages = [...(job.afterImages ?? []), ...afterImagePaths];
+    return this.jobsRepo.save(job);
+  }
+
+  // ─── NEW: CLIENT SUBMITS RATING & FEEDBACK ───────────────────────────────
+  async submitRating(jobId: number, dto: RateJobDto, client: User): Promise<Job> {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['client'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    if (job.client?.id !== client.id) {
+      throw new ForbiddenException('Only the client who booked this job can rate it.');
+    }
+    if (job.status !== JobStatus.COMPLETED && job.status !== JobStatus.CLOSED) {
+      throw new BadRequestException('You can only rate a completed job.');
+    }
+    if (job.rating != null) {
+      throw new BadRequestException('This job has already been rated.');
+    }
+
+    job.rating = dto.rating;
+    job.feedback = dto.feedback ?? null;
+    return this.jobsRepo.save(job);
+  }
+
+  // ─── HAVERSINE HELPER ────────────────────────────────────────────────────
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = this.toRad(lat2 - lat1);

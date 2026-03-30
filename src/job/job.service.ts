@@ -31,7 +31,7 @@ export class JobService {
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
   // Now accepts a plain text `address` typed by the user (no GPS needed).
   // `beforeImages` are file paths saved by the controller after multer upload.
-  async createJob(client: User, dto: CreateJobDto, beforeImagePaths: string[] = []) {
+  async createJob(client: User, dto: CreateJobDto, clientImagePaths: string[] = []) {
     const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
     if (!serviceItem) throw new NotFoundException('Service item not found');
 
@@ -44,7 +44,8 @@ export class JobService {
       // are kept for backwards compatibility but no longer required
       clientLatitude: dto.clientLatitude ?? null,
       clientLongitude: dto.clientLongitude ?? null,
-      beforeImages: beforeImagePaths,
+      clientImages: clientImagePaths,
+      beforeImages: null as any,
       afterImages: null as any,
     });
 
@@ -257,6 +258,23 @@ export class JobService {
       ...job,
       paymentStatus: job.payment?.status ?? null,
     };
+  }
+
+  // ─── NEW: TECHNICIAN UPLOADS BEFORE IMAGES (taken on site after accepting) ─
+  async addBeforeImages(jobId: number, beforeImagePaths: string[], technician: User): Promise<Job> {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.technician?.id !== technician.id) {
+      throw new ForbiddenException('Only the assigned technician can upload before photos.');
+    }
+    if (job.status !== JobStatus.ACCEPTED) {
+      throw new BadRequestException('Job must be accepted to upload before photos.');
+    }
+    job.beforeImages = [...(job.beforeImages ?? []), ...beforeImagePaths];
+    return this.jobsRepo.save(job);
   }
 
   // ─── NEW: TECHNICIAN UPLOADS AFTER IMAGES ────────────────────────────────

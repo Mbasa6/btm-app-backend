@@ -56,27 +56,31 @@ export class Job {
   serviceItem: ServiceItem | null;
 
   // ─── CLIENT LOCATION (optional — kept for proximity filtering) ────────────
-  // No longer required from the client. If present, used by getAssignedJobs
-  // to filter technicians by radius. address field is the primary input now.
   @Column({ type: 'float', nullable: true })
   clientLatitude: number | null;
 
   @Column({ type: 'float', nullable: true })
   clientLongitude: number | null;
 
-  // ─── ADDRESS (plain text typed by client — no GPS needed) ─────────────────
+  // ─── ADDRESS (plain text typed by client) ─────────────────────────────────
   @Column({ type: 'varchar', length: 500, nullable: true })
   address: string | null;
 
-  // ─── BEFORE / AFTER IMAGES ────────────────────────────────────────────────
-  // Arrays of server file paths e.g. ["/uploads/jobs/before/1234.jpg"]
+  // ─── IMAGES ───────────────────────────────────────────────────────────────
+
+  // Photos uploaded by the CLIENT at booking time (optional reference photos)
+  @Column({ type: 'json', nullable: true })
+  clientImages: string[];
+
+  // Photos taken by the TECHNICIAN on arrival (before work starts)
   @Column({ type: 'json', nullable: true })
   beforeImages: string[];
 
+  // Photos taken by the TECHNICIAN after completing the work
   @Column({ type: 'json', nullable: true })
   afterImages: string[];
 
-  // ─── RATING & FEEDBACK (submitted by client after job completion) ──────────
+  // ─── RATING & FEEDBACK ────────────────────────────────────────────────────
   @Column({ type: 'int', nullable: true })
   rating: number | null;
 

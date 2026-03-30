@@ -30,8 +30,8 @@ import { Roles } from '../auth/roles.decorator';
 import { GetUser } from '../auth/get-user.decorator';
 import { User } from '../entities/user.entity';
 
-// ── Multer storage factory ───────────────────────────────────────────────────
-const imageStorage = (subfolder: 'before' | 'after') =>
+// ── Multer storage factory ─────────────────────────────────────────────────
+const imageStorage = (subfolder: string) =>
   diskStorage({
     destination: (_req, _file, cb) => {
       const dir = join(process.cwd(), 'uploads', 'jobs', subfolder);
@@ -49,59 +49,59 @@ const imageStorage = (subfolder: 'before' | 'after') =>
 export class JobController {
   constructor(private jobService: JobService) {}
 
-  // ── POST /jobs — client creates a booking with optional before photos ──────
+  // ── POST /jobs — client creates booking with optional reference photos ─────
   @Post()
   @Roles('client')
   @UseInterceptors(
-    FilesInterceptor('beforeImages', 4, { storage: imageStorage('before') }),
+    FilesInterceptor('clientImages', 4, { storage: imageStorage('client') }),
   )
   createJob(
     @GetUser() user: User,
     @Body() dto: CreateJobDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    const beforeImagePaths = (files ?? []).map(
-      (f) => `/uploads/jobs/before/${f.filename}`,
+    const clientImagePaths = (files ?? []).map(
+      (f) => `/uploads/jobs/client/${f.filename}`,
     );
-    return this.jobService.createJob(user, dto, beforeImagePaths);
+    return this.jobService.createJob(user, dto, clientImagePaths);
   }
 
-  // ── GET /jobs/my ──────────────────────────────────────────────────────────
+  // ── GET /jobs/my ───────────────────────────────────────────────────────────
   @Get('my')
   @Roles('client', 'technician')
   getMyJobs(@GetUser() user: User) {
     return this.jobService.getMyJobs(user);
   }
 
-  // ── GET /jobs/assigned ────────────────────────────────────────────────────
+  // ── GET /jobs/assigned ─────────────────────────────────────────────────────
   @Get('assigned')
   @Roles('technician')
   getAssignedJobs(@GetUser() user: User) {
     return this.jobService.getAssignedJobs(user);
   }
 
-  // ── POST /jobs/:id/accept ─────────────────────────────────────────────────
+  // ── POST /jobs/:id/accept ──────────────────────────────────────────────────
   @Post(':id/accept')
   @Roles('technician')
   acceptJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.jobService.acceptJob(user, id);
   }
 
-  // ── POST /jobs/:id/decline ────────────────────────────────────────────────
+  // ── POST /jobs/:id/decline ─────────────────────────────────────────────────
   @Post(':id/decline')
   @Roles('technician')
   declineJob(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.jobService.declineJob(user, id);
   }
 
-  // ── GET /jobs (admin) ─────────────────────────────────────────────────────
+  // ── GET /jobs (admin) ──────────────────────────────────────────────────────
   @Get()
   @Roles('admin')
   getAllJobs() {
     return this.jobService.getAllJobs();
   }
 
-  // ── PUT /jobs/:id/status ──────────────────────────────────────────────────
+  // ── PUT /jobs/:id/status ───────────────────────────────────────────────────
   @Put(':id/status')
   @Roles('admin', 'technician')
   updateJobStatus(
@@ -111,7 +111,7 @@ export class JobController {
     return this.jobService.updateJobStatus(id, dto.status);
   }
 
-  // ── PATCH /jobs/:id/assign/:techId ────────────────────────────────────────
+  // ── PATCH /jobs/:id/assign/:techId ─────────────────────────────────────────
   @Patch(':id/assign/:techId')
   @Roles('admin')
   assignTechnician(
@@ -121,14 +121,14 @@ export class JobController {
     return this.jobService.assignTechnician(jobId, techId);
   }
 
-  // ── PATCH /jobs/:id/close ─────────────────────────────────────────────────
+  // ── PATCH /jobs/:id/close ──────────────────────────────────────────────────
   @Patch(':id/close')
   @Roles('admin')
   forceCloseJob(@Param('id', ParseIntPipe) id: number) {
     return this.jobService.forceCloseJob(id);
   }
 
-  // ── GET /jobs/filter ──────────────────────────────────────────────────────
+  // ── GET /jobs/filter ───────────────────────────────────────────────────────
   @Get('filter')
   @Roles('admin')
   filterJobs(
@@ -139,7 +139,24 @@ export class JobController {
     return this.jobService.filterJobs({ status, technicianId, clientId });
   }
 
-  // ── PATCH /jobs/:id/after-images — technician uploads after photos ─────────
+  // ── PATCH /jobs/:id/before-images — technician takes before photo on site ──
+  @Patch(':id/before-images')
+  @Roles('technician')
+  @UseInterceptors(
+    FilesInterceptor('beforeImages', 4, { storage: imageStorage('before') }),
+  )
+  uploadBeforeImages(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFiles() files: Express.Multer.File[],
+    @GetUser() user: User,
+  ) {
+    const beforeImagePaths = (files ?? []).map(
+      (f) => `/uploads/jobs/before/${f.filename}`,
+    );
+    return this.jobService.addBeforeImages(id, beforeImagePaths, user);
+  }
+
+  // ── PATCH /jobs/:id/after-images — technician takes after photo on completion
   @Patch(':id/after-images')
   @Roles('technician')
   @UseInterceptors(
@@ -156,7 +173,7 @@ export class JobController {
     return this.jobService.addAfterImages(id, afterImagePaths, user);
   }
 
-  // ── POST /jobs/:id/rating — client rates a completed job ──────────────────
+  // ── POST /jobs/:id/rating — client rates completed job ─────────────────────
   @Post(':id/rating')
   @Roles('client')
   submitRating(
@@ -167,8 +184,7 @@ export class JobController {
     return this.jobService.submitRating(id, dto, user);
   }
 
-  // ── GET /jobs/:id ─────────────────────────────────────────────────────────
-  // Keep this last — otherwise 'filter', 'my', 'assigned' get swallowed by :id
+  // ── GET /jobs/:id — keep last to avoid swallowing named routes ─────────────
   @Get(':id')
   @Roles('admin', 'client', 'technician')
   getJobById(@Param('id', ParseIntPipe) id: number) {

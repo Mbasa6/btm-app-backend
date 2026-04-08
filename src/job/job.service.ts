@@ -195,12 +195,22 @@ export class JobService {
   };
 
   async updateJobStatus(jobId: number, newStatus: JobStatus) {
-    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['payment'],
+    });
     if (!job) throw new NotFoundException('Job not found');
 
     const allowed = this.validTransitions[job.status];
     if (!allowed?.includes(newStatus)) {
       throw new ForbiddenException('Invalid job status transition');
+    }
+
+    // Payment gate: job must be paid before moving from pending to accepted
+    if (job.status === JobStatus.PENDING && newStatus === JobStatus.ACCEPTED) {
+      if (!job.payment || job.payment.status !== PaymentStatus.PAID) {
+        throw new ForbiddenException('Payment must be completed before accepting this job.');
+      }
     }
 
     job.status = newStatus;
@@ -316,6 +326,18 @@ export class JobService {
 
     job.rating = dto.rating;
     job.feedback = dto.feedback ?? null;
+    return this.jobsRepo.save(job);
+  }
+
+  // ─── ADMIN: REVERT JOB TO PENDING ───────────────────────────────────────────
+  async revertToPending(jobId: number): Promise<Job> {
+    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Job not found');
+    if (!['accepted', 'in_progress'].includes(job.status)) {
+      throw new BadRequestException('Only accepted or in_progress jobs can be reverted to pending.');
+    }
+    job.status = JobStatus.PENDING;
+    job.technician = null;
     return this.jobsRepo.save(job);
   }
 

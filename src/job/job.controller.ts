@@ -184,6 +184,13 @@ export class JobController {
     return this.jobService.submitRating(id, dto, user);
   }
 
+  // ── PATCH /jobs/:id/revert-pending — admin reverts job to pending ────────────
+  @Patch(':id/revert-pending')
+  @Roles('admin')
+  revertToPending(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.revertToPending(id);
+  }
+
   // ── GET /jobs/:id — keep last to avoid swallowing named routes ─────────────
   @Get(':id')
   @Roles('admin', 'client', 'technician')

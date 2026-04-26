@@ -99,11 +99,11 @@ export class PaymentService {
     if (!job || !job.payment) throw new NotFoundException('Payment not initiated');
 
     const data: Record<string, string> = {
-      merchant_id: process.env.PAYFAST_MERCHANT_ID!,
-      merchant_key: process.env.PAYFAST_MERCHANT_KEY!,
-      return_url: process.env.PAYFAST_RETURN_URL!,
-      cancel_url: process.env.PAYFAST_CANCEL_URL!,
-      notify_url: process.env.PAYFAST_NOTIFY_URL!,
+      merchant_id: process.env.PAYFAST_MERCHANT_ID!.trim(),
+      merchant_key: process.env.PAYFAST_MERCHANT_KEY!.trim(),
+      return_url: process.env.PAYFAST_RETURN_URL!.trim(),
+      cancel_url: process.env.PAYFAST_CANCEL_URL!.trim(),
+      notify_url: process.env.PAYFAST_NOTIFY_URL!.trim(),
       m_payment_id: String(job.payment.id),
       amount: Number(job.payment.amount).toFixed(2),
       item_name: `BTM Job #${job.id}`,
@@ -113,19 +113,21 @@ export class PaymentService {
       name_last: job.client?.fullName?.split(' ').slice(1).join(' ') ?? '',
     };
 
-    const signature = this.generateSignature(
-      data,
-      process.env.PAYFAST_PASSPHRASE || undefined,
+    const payload = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== ''),
     );
 
-    const formInputs = Object.entries({ ...data, signature })
+    const signature = this.generateSignature(
+      payload,
+      process.env.PAYFAST_PASSPHRASE?.trim() || undefined,
+    );
+
+    const formInputs = Object.entries({ ...payload, signature })
       .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}"/>`)
       .join('\n');
 
-    // PayFast main payment page — always use this URL for full payment method selection
-    const payfastUrl = process.env.NODE_ENV === 'production'
-      ? 'https://www.payfast.co.za/eng/process'
-      : 'https://sandbox.payfast.co.za/eng/process';
+    // Use the explicit PayFast URL from env to avoid live/sandbox mismatches
+    const payfastUrl = process.env.PAYFAST_BASE_URL?.trim() || 'https://www.payfast.co.za/eng/process';
 
     return `
       <html>

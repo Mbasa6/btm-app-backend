@@ -36,12 +36,8 @@ export class PaymentService {
 
     const savedPayment = await this.paymentRepo.save(payment);
 
-    // IMPORTANT: attach payment to job on the owning side
-    job.payment = savedPayment;
-
-    // Also store client price for payout calculation
+    // ── Store clientPrice on the job so payout can be calculated at dispatch ──
     job.clientPrice = amount;
-
     await this.jobRepo.save(job);
 
     return savedPayment;
@@ -104,7 +100,12 @@ export class PaymentService {
       item_name: `BTM Job #${job.id}`,
     };
 
-    const formInputs = Object.entries(data)
+    const signature = this.generateSignature(
+      data,
+      process.env.PAYFAST_PASSPHRASE || undefined,
+    );
+
+    const formInputs = Object.entries({ ...data, signature })
       .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}"/>`)
       .join('\n');
 

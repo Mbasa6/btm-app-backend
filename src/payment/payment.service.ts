@@ -59,14 +59,13 @@ export class PaymentService {
   }
 
   private generateSignature(data: Record<string, any>, passphrase?: string) {
-    const query = Object.keys(data)
-      .filter(k => data[k] !== undefined && data[k] !== '')
-      .sort()
-      .map(k => `${k}=${encodeURIComponent(data[k]).replace(/%20/g, '+')}`)
+    const query = Object.entries(data)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(String(value)).replace(/%20/g, '+')}`)
       .join('&');
 
     const stringToSign = passphrase
-      ? `${query}&passphrase=${encodeURIComponent(passphrase)}`
+      ? `${query}&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, '+')}`
       : query;
 
     return crypto.createHash('md5').update(stringToSign).digest('hex');

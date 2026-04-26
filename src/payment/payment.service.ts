@@ -93,7 +93,7 @@ export class PaymentService {
   async createBasicPayFastPayment(jobId: number) {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
-      relations: ['payment', 'client'],
+      relations: ['payment'],
     });
 
     if (!job || !job.payment) throw new NotFoundException('Payment not initiated');
@@ -107,22 +107,14 @@ export class PaymentService {
       m_payment_id: String(job.payment.id),
       amount: Number(job.payment.amount).toFixed(2),
       item_name: `BTM Job #${job.id}`,
-      // Pass buyer details — helps PayFast show the full payment selection page
-      email_address: job.client?.email ?? '',
-      name_first: job.client?.fullName?.split(' ')[0] ?? '',
-      name_last: job.client?.fullName?.split(' ').slice(1).join(' ') ?? '',
     };
 
-    const payload = Object.fromEntries(
-      Object.entries(data).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-    );
-
     const signature = this.generateSignature(
-      payload,
+      data,
       process.env.PAYFAST_PASSPHRASE?.trim() || undefined,
     );
 
-    const formInputs = Object.entries({ ...payload, signature })
+    const formInputs = Object.entries({ ...data, signature })
       .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}"/>`)
       .join('\n');
 

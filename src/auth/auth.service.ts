@@ -16,7 +16,7 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterUserDto) {
-    const const { email, password, fullName, role, phoneNumber } = registerDto;
+    const { email, password, fullName, role, phoneNumber } = registerDto;
 
     const existing = await this.usersRepo.findOne({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
@@ -28,7 +28,7 @@ export class AuthService {
       password: hashed,
       fullName,
       role,
-      phoneNumber
+      phoneNumber,
       isActive: role === 'admin' ? true : false, // ✅ Admins start active
     });
 

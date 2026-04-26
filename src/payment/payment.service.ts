@@ -15,7 +15,7 @@ export class PaymentService {
     private jobRepo: Repository<Job>,
   ) {}
 
-  /** ADMIN / SYSTEM: CREATE PAYMENT */
+  /** ADMIN: CREATE PAYMENT — also stores clientPrice on job for payout calculation */
   async initiatePayment(jobId: number, amount: number) {
     const job = await this.jobRepo.findOne({
       where: { id: jobId },
@@ -34,10 +34,16 @@ export class PaymentService {
       status: PaymentStatus.PENDING,
     });
 
-    return this.paymentRepo.save(payment);
+    const savedPayment = await this.paymentRepo.save(payment);
+
+    // ── Store clientPrice on the job so payout can be calculated at dispatch ──
+    job.clientPrice = amount;
+    await this.jobRepo.save(job);
+
+    return savedPayment;
   }
 
-  /** WEBHOOK / MANUAL CONFIRM (Phase 1) */
+  /** WEBHOOK / MANUAL CONFIRM */
   async markAsPaid(paymentId: number, providerRef?: string) {
     const payment = await this.paymentRepo.findOne({
       where: { id: paymentId },
@@ -109,9 +115,5 @@ export class PaymentService {
       </html>
     `;
   }
-
-
-
-
-
 }
+

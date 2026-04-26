@@ -55,28 +55,24 @@ export class Job {
   @ManyToOne(() => ServiceItem, { nullable: true, eager: true, onDelete: 'SET NULL' })
   serviceItem: ServiceItem | null;
 
-  // ─── CLIENT LOCATION (optional — kept for proximity filtering) ────────────
+  // ─── CLIENT LOCATION ──────────────────────────────────────────────────────
   @Column({ type: 'float', nullable: true })
   clientLatitude: number | null;
 
   @Column({ type: 'float', nullable: true })
   clientLongitude: number | null;
 
-  // ─── ADDRESS (plain text typed by client) ─────────────────────────────────
+  // ─── ADDRESS ──────────────────────────────────────────────────────────────
   @Column({ type: 'varchar', length: 500, nullable: true })
   address: string | null;
 
   // ─── IMAGES ───────────────────────────────────────────────────────────────
-
-  // Photos uploaded by the CLIENT at booking time (optional reference photos)
   @Column({ type: 'json', nullable: true })
   clientImages: string[];
 
-  // Photos taken by the TECHNICIAN on arrival (before work starts)
   @Column({ type: 'json', nullable: true })
   beforeImages: string[];
 
-  // Photos taken by the TECHNICIAN after completing the work
   @Column({ type: 'json', nullable: true })
   afterImages: string[];
 
@@ -86,4 +82,24 @@ export class Job {
 
   @Column({ type: 'text', nullable: true })
   feedback: string | null;
+
+  // ─── PAYOUT MODEL ─────────────────────────────────────────────────────────
+  @Column({ type: 'float', nullable: true })
+  clientPrice: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  technicianPercentage: number | null;
+
+  @Column({ type: 'float', nullable: true })
+  technicianPayout: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  payoutLocked: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  dispatchedAt: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  acceptedAt: Date | null;
 }
+

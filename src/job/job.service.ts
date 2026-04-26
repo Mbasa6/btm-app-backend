@@ -14,8 +14,8 @@ import { PaymentStatus } from '../payment/payment-status.enum';
 import { ServiceItem } from '../entities/service-item.entity';
 import { RateJobDto } from '../dto/rate-job.dto';
 
-// Max distance in km a technician will see jobs from their location
 const JOB_RADIUS_KM = 20;
+const PAYOUT_FLOOR = 500;
 
 @Injectable()
 export class JobService {
@@ -29,8 +29,6 @@ export class JobService {
   ) {}
 
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
-  // Now accepts a plain text `address` typed by the user (no GPS needed).
-  // `beforeImages` are file paths saved by the controller after multer upload.
   async createJob(client: User, dto: CreateJobDto, clientImagePaths: string[] = []) {
     const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
     if (!serviceItem) throw new NotFoundException('Service item not found');
@@ -40,8 +38,6 @@ export class JobService {
       client,
       status: JobStatus.PENDING,
       serviceItem,
-      // Address is now plain text from the user — clientLatitude/Longitude
-      // are kept for backwards compatibility but no longer required
       clientLatitude: dto.clientLatitude ?? null,
       clientLongitude: dto.clientLongitude ?? null,
       clientImages: clientImagePaths,
@@ -79,6 +75,7 @@ export class JobService {
 
     job.technician = freshTech;
     job.status = JobStatus.ACCEPTED;
+    job.acceptedAt = new Date(); // ← stamp accepted timestamp
 
     return this.jobsRepo.save(job);
   }
@@ -119,16 +116,7 @@ export class JobService {
     return [];
   }
 
-  /**
-   * GET PENDING JOBS FOR TECHNICIAN — filtered by proximity.
-   *
-   * Flow:
-   * 1. Fetch all paid+pending jobs the technician hasn't declined
-   * 2. If the job has a clientLatitude/clientLongitude (set via geocoding or legacy GPS),
-   *    filter to jobs within JOB_RADIUS_KM (default 20km)
-   * 3. If either side has no coordinates, fall back to showing the job anyway
-   *    (so no jobs are silently lost due to missing location data)
-   */
+  // ─── GET PENDING JOBS FOR TECHNICIAN ─────────────────────────────────────
   async getAssignedJobs(technician: User) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
     if (!freshTech) throw new NotFoundException('Technician not found');
@@ -147,25 +135,21 @@ export class JobService {
       )
       .getMany();
 
-    // If technician has no saved location yet, return all jobs (graceful fallback)
     if (freshTech.latitude == null || freshTech.longitude == null) {
       return jobs.map(job => ({ ...job, distanceKm: null }));
     }
 
-    // Filter by radius and attach distance
     const nearbyJobs = jobs
       .map(job => {
         if (job.clientLatitude == null || job.clientLongitude == null) {
           return { ...job, distanceKm: null };
         }
-
         const distanceKm = this.haversineKm(
           freshTech.latitude!,
           freshTech.longitude!,
           job.clientLatitude,
           job.clientLongitude,
         );
-
         return { ...job, distanceKm };
       })
       .filter(job => job.distanceKm === null || job.distanceKm <= JOB_RADIUS_KM)
@@ -206,7 +190,6 @@ export class JobService {
       throw new ForbiddenException('Invalid job status transition');
     }
 
-    // Payment gate: job must be paid before moving from pending to accepted
     if (job.status === JobStatus.PENDING && newStatus === JobStatus.ACCEPTED) {
       if (!job.payment || job.payment.status !== PaymentStatus.PAID) {
         throw new ForbiddenException('Payment must be completed before accepting this job.');
@@ -217,11 +200,11 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── ADMIN: ASSIGN TECHNICIAN ────────────────────────────────────────────
+  // ─── ADMIN: ASSIGN TECHNICIAN + CALCULATE PAYOUT ─────────────────────────
   async assignTechnician(jobId: number, technicianId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['technician', 'client'],
+      relations: ['technician', 'client', 'serviceItem'], // ← serviceItem required for payout
     });
     if (!job) throw new NotFoundException('Job not found');
 
@@ -232,6 +215,15 @@ export class JobService {
 
     job.technician = tech;
     if (job.status === JobStatus.PENDING) job.status = JobStatus.ACCEPTED;
+
+    // ── Auto-calculate payout on dispatch ────────────────────────────────────
+    if (job.clientPrice != null && job.serviceItem?.technicianPercentage != null) {
+      const pct = job.serviceItem.technicianPercentage;
+      job.technicianPercentage = pct;
+      job.technicianPayout = Math.max(job.clientPrice * pct, PAYOUT_FLOOR);
+      job.payoutLocked = true;
+      job.dispatchedAt = new Date();
+    }
 
     return this.jobsRepo.save(job);
   }
@@ -259,7 +251,7 @@ export class JobService {
   async getJobById(jobId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['client', 'technician', 'payment'],
+      relations: ['client', 'technician', 'payment', 'serviceItem'], // ← serviceItem added
     });
 
     if (!job) throw new NotFoundException('Job not found');
@@ -270,7 +262,7 @@ export class JobService {
     };
   }
 
-  // ─── NEW: TECHNICIAN UPLOADS BEFORE IMAGES (taken on site after accepting) ─
+  // ─── TECHNICIAN UPLOADS BEFORE IMAGES ────────────────────────────────────
   async addBeforeImages(jobId: number, beforeImagePaths: string[], technician: User): Promise<Job> {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
@@ -287,7 +279,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── NEW: TECHNICIAN UPLOADS AFTER IMAGES ────────────────────────────────
+  // ─── TECHNICIAN UPLOADS AFTER IMAGES ─────────────────────────────────────
   async addAfterImages(jobId: number, afterImagePaths: string[], technician: User): Promise<Job> {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
@@ -306,7 +298,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── NEW: CLIENT SUBMITS RATING & FEEDBACK ───────────────────────────────
+  // ─── CLIENT SUBMITS RATING ────────────────────────────────────────────────
   async submitRating(jobId: number, dto: RateJobDto, client: User): Promise<Job> {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
@@ -329,7 +321,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── ADMIN: REVERT JOB TO PENDING ───────────────────────────────────────────
+  // ─── ADMIN: REVERT JOB TO PENDING ────────────────────────────────────────
   async revertToPending(jobId: number): Promise<Job> {
     const job = await this.jobsRepo.findOne({ where: { id: jobId } });
     if (!job) throw new NotFoundException('Job not found');
@@ -341,7 +333,7 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── HAVERSINE HELPER ────────────────────────────────────────────────────
+  // ─── HAVERSINE HELPER ─────────────────────────────────────────────────────
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371;
     const dLat = this.toRad(lat2 - lat1);
@@ -360,3 +352,4 @@ export class JobService {
     return (deg * Math.PI) / 180;
   }
 }
+

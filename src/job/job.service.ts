@@ -62,7 +62,7 @@ export class JobService {
 
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['technician', 'payment'],
+      relations: ['technician', 'payment', 'serviceItem'], // ← serviceItem needed for payout
     });
 
     if (!job) throw new NotFoundException('Job not found');
@@ -75,7 +75,16 @@ export class JobService {
 
     job.technician = freshTech;
     job.status = JobStatus.ACCEPTED;
-    job.acceptedAt = new Date(); // ← stamp accepted timestamp
+    job.acceptedAt = new Date();
+
+    // ── Auto-calculate payout when technician accepts ─────────────────────
+    if (job.clientPrice != null && job.serviceItem?.technicianPercentage != null) {
+      const pct = job.serviceItem.technicianPercentage;
+      job.technicianPercentage = pct;
+      job.technicianPayout = Math.max(job.clientPrice * pct, 500);
+      job.payoutLocked = true;
+      job.dispatchedAt = new Date();
+    }
 
     return this.jobsRepo.save(job);
   }

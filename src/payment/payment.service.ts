@@ -36,8 +36,12 @@ export class PaymentService {
 
     const savedPayment = await this.paymentRepo.save(payment);
 
-    // ── Store clientPrice on the job so payout can be calculated at dispatch ──
+    // IMPORTANT: attach payment to job on the owning side
+    job.payment = savedPayment;
+
+    // Also store client price for payout calculation
     job.clientPrice = amount;
+
     await this.jobRepo.save(job);
 
     return savedPayment;

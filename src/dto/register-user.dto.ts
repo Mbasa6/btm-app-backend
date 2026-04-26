@@ -21,4 +21,8 @@ export class RegisterUserDto {
   @IsString()
   @IsIn(validRoles, { message: `Role must be one of: ${validRoles.join(', ')}` })
   role?: 'client' | 'technician' | 'admin';
+
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
 }

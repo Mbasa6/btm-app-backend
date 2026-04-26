@@ -16,7 +16,7 @@ export class UserService {
   getAllTechnicians(): Promise<User[]> {
     return this.usersRepository.find({
       where: { role: 'technician' },
-      select: ['id', 'fullName', 'email', 'isAvailable', 'role'],
+      select: ['id', 'fullName', 'email', 'phoneNumber', 'isAvailable', 'role'],
       order: { fullName: 'ASC' },
     });
   }
@@ -31,7 +31,7 @@ export class UserService {
 
   getAllUsers(): Promise<User[]> {
     return this.usersRepository.find({
-      select: ['id', 'fullName', 'email', 'role', 'isAvailable', 'approvalStatus'],
+      select: ['id', 'fullName', 'email', 'phoneNumber', 'role', 'isAvailable', 'approvalStatus'],
       order: { id: 'ASC' },
     });
   }

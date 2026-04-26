@@ -55,4 +55,6 @@ export class User {
   })
   approvalStatus: ApprovalStatus;
 
+  @Column({ nullable: true })
+  phoneNumber?: string;
 }

@@ -7,6 +7,7 @@ import { JobController } from './job.controller';
 import { User } from '../entities/user.entity';
 import { UserModule } from '../user/user.module';
 import { ServiceItem } from '../entities/service-item.entity';
+import { PushNotificationService } from './push-notification.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { ServiceItem } from '../entities/service-item.entity';
     UserModule,
     MulterModule.register(),
   ],
-  providers: [JobService],
+  providers: [JobService, PushNotificationService],
   controllers: [JobController],
 })
 export class JobModule {}

@@ -96,6 +96,13 @@ export class Job {
   @Column({ type: 'boolean', default: false })
   payoutLocked: boolean;
 
+  @Column({
+    type: 'enum',
+    enum: ['none', 'requested', 'approved', 'paid'],
+    default: 'none',
+  })
+  payoutStatus: 'none' | 'requested' | 'approved' | 'paid';
+
   @Column({ type: 'timestamp', nullable: true })
   dispatchedAt: Date | null;
 

@@ -13,6 +13,7 @@ import { CreateJobDto } from '../dto/create-job.dto';
 import { PaymentStatus } from '../payment/payment-status.enum';
 import { ServiceItem } from '../entities/service-item.entity';
 import { RateJobDto } from '../dto/rate-job.dto';
+import { PushNotificationService } from './push-notification.service';
 
 const JOB_RADIUS_KM = 20;
 const PAYOUT_FLOOR = 500;
@@ -26,6 +27,7 @@ export class JobService {
     private userRepo: Repository<User>,
     @InjectRepository(ServiceItem)
     private serviceItemRepo: Repository<ServiceItem>,
+    private pushService: PushNotificationService,
   ) {}
 
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
@@ -62,23 +64,23 @@ export class JobService {
 
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['technician', 'payment', 'serviceItem'], // ← serviceItem needed for payout
+      relations: ['technician', 'payment', 'serviceItem'],
     });
 
     if (!job) throw new NotFoundException('Job not found');
     if (job.status !== JobStatus.PENDING) throw new ForbiddenException('Job not available');
+    if (job.technician?.id !== freshTech.id) throw new ForbiddenException('This job was not assigned to you');
 
     // 🔐 PAYMENT GATE
     if (!job.payment || job.payment.status !== PaymentStatus.PAID) {
       throw new ForbiddenException('Job not dispatchable');
     }
 
-    job.technician = freshTech;
     job.status = JobStatus.ACCEPTED;
     job.acceptedAt = new Date();
 
-    // ── Auto-calculate payout when technician accepts ─────────────────────
-    if (job.clientPrice != null && job.serviceItem?.technicianPercentage != null) {
+    // Lock payout if not already locked
+    if (job.clientPrice != null && job.serviceItem?.technicianPercentage != null && !job.payoutLocked) {
       const pct = job.serviceItem.technicianPercentage;
       job.technicianPercentage = pct;
       job.technicianPayout = Math.max(job.clientPrice * pct, 500);
@@ -209,11 +211,11 @@ export class JobService {
     return this.jobsRepo.save(job);
   }
 
-  // ─── ADMIN: ASSIGN TECHNICIAN + CALCULATE PAYOUT ─────────────────────────
+  // ─── ADMIN: ASSIGN TECHNICIAN (no auto-accept — stays PENDING) ───────────
   async assignTechnician(jobId: number, technicianId: number) {
     const job = await this.jobsRepo.findOne({
       where: { id: jobId },
-      relations: ['technician', 'client', 'serviceItem'], // ← serviceItem required for payout
+      relations: ['technician', 'client', 'serviceItem'],
     });
     if (!job) throw new NotFoundException('Job not found');
 
@@ -223,9 +225,10 @@ export class JobService {
     if (!tech) throw new NotFoundException('Technician not found or inactive');
 
     job.technician = tech;
-    if (job.status === JobStatus.PENDING) job.status = JobStatus.ACCEPTED;
+    // ✅ Status stays PENDING — tech must accept explicitly
+    // Do NOT set job.status = JobStatus.ACCEPTED here
 
-    // ── Auto-calculate payout on dispatch ────────────────────────────────────
+    // Pre-calculate payout so technician sees amount before accepting
     if (job.clientPrice != null && job.serviceItem?.technicianPercentage != null) {
       const pct = job.serviceItem.technicianPercentage;
       job.technicianPercentage = pct;
@@ -234,8 +237,80 @@ export class JobService {
       job.dispatchedAt = new Date();
     }
 
+    const saved = await this.jobsRepo.save(job);
+
+    // 🔔 Notify technician of new assignment
+    await this.pushService.sendPush(
+      tech.expoPushToken,
+      '📋 New Job Assigned',
+      `You have been assigned job: ${job.title}. Please accept or decline.`,
+      { jobId: job.id },
+    );
+
+    return saved;
+  }
+
+  // ─── PAYOUT: TECHNICIAN REQUESTS PAYOUT ──────────────────────────────────
+  async requestPayout(technician: User, jobId: number) {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.technician?.id !== technician.id) throw new ForbiddenException('Not your job');
+    if (job.status !== JobStatus.CLOSED) throw new BadRequestException('Job must be closed to request payout');
+    if (job.payoutStatus !== 'none') throw new BadRequestException('Payout already requested');
+
+    job.payoutStatus = 'requested';
     return this.jobsRepo.save(job);
   }
+
+  // ─── PAYOUT: ADMIN APPROVES PAYOUT ───────────────────────────────────────
+  async approvePayout(jobId: number) {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.payoutStatus !== 'requested') throw new BadRequestException('No pending payout request');
+
+    job.payoutStatus = 'approved';
+    const saved = await this.jobsRepo.save(job);
+
+    // 🔔 Notify technician
+    await this.pushService.sendPush(
+      job.technician?.expoPushToken,
+      '✅ Payout Approved',
+      `Your payout of R${job.technicianPayout} for "${job.title}" has been approved. Payment is on the way.`,
+      { jobId: job.id },
+    );
+
+    return saved;
+  }
+
+  // ─── PAYOUT: ADMIN MARKS AS PAID ─────────────────────────────────────────
+  async markPayoutPaid(jobId: number) {
+    const job = await this.jobsRepo.findOne({
+      where: { id: jobId },
+      relations: ['technician'],
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.payoutStatus !== 'approved') throw new BadRequestException('Payout not approved yet');
+
+    job.payoutStatus = 'paid';
+    const saved = await this.jobsRepo.save(job);
+
+    // 🔔 Notify technician
+    await this.pushService.sendPush(
+      job.technician?.expoPushToken,
+      '💰 Payout Paid',
+      `Your payout of R${job.technicianPayout} for "${job.title}" has been paid.`,
+      { jobId: job.id },
+    );
+
+    return saved;
+  }
+
 
   async forceCloseJob(jobId: number) {
     const job = await this.jobsRepo.findOne({ where: { id: jobId } });

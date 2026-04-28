@@ -116,6 +116,19 @@ export class UserController {
   }
 
   /**
+   * PATCH /users/push-token
+   * Saves the Expo push token for the current user (any role).
+   */
+  @Patch('push-token')
+  @Roles('admin', 'technician', 'client')
+  updatePushToken(
+    @GetUser() user: User,
+    @Body('expoPushToken') expoPushToken: string,
+  ) {
+    return this.userService.updatePushToken(user.id, expoPushToken);
+  }
+
+  /**
    * GET /users/nearest-technicians?lat=XX&lng=YY&limit=5
    * Returns available technicians sorted by distance from given coordinates.
    * Used by admin when assigning a job.

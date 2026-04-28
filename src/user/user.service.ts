@@ -105,6 +105,14 @@ export class UserService {
     return { message: 'Location updated successfully' };
   }
 
+  async updatePushToken(userId: number, expoPushToken: string): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.expoPushToken = expoPushToken;
+    await this.usersRepository.save(user);
+    return { message: 'Push token saved' };
+  }
+
   /**
    * Given a client's coordinates, returns available technicians
    * sorted by distance (nearest first) using the Haversine formula.

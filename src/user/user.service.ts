@@ -152,6 +152,15 @@ export class UserService {
    * Haversine formula — calculates great-circle distance between two
    * lat/lng points in kilometres.
    */
+  async updateBankDetails(userId: number, dto: { bankName: string; bankAccountNumber: string; bankAccountHolder: string }) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.bankName = dto.bankName;
+    user.bankAccountNumber = dto.bankAccountNumber;
+    user.bankAccountHolder = dto.bankAccountHolder;
+    return this.usersRepository.save(user);
+  }
+
   private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371; // Earth radius in km
     const dLat = this.toRad(lat2 - lat1);

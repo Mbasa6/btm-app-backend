@@ -129,6 +129,19 @@ export class UserController {
   }
 
   /**
+   * PATCH /users/me/bank-details
+   * Technician saves their bank details for payout.
+   */
+  @Patch('me/bank-details')
+  @Roles('technician')
+  updateBankDetails(
+    @GetUser() user: User,
+    @Body() dto: { bankName: string; bankAccountNumber: string; bankAccountHolder: string },
+  ) {
+    return this.userService.updateBankDetails(user.id, dto);
+  }
+
+  /**
    * GET /users/nearest-technicians?lat=XX&lng=YY&limit=5
    * Returns available technicians sorted by distance from given coordinates.
    * Used by admin when assigning a job.

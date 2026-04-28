@@ -191,12 +191,6 @@ export class JobController {
     return this.jobService.revertToPending(id);
   }
 
-  // ── PATCH /jobs/:id/revert-pending — admin reverts job to pending ────────────
-  @Patch(':id/revert-pending')
-  @Roles('admin')
-  revertToPending(@Param('id', ParseIntPipe) id: number) {
-    return this.jobService.revertToPending(id);
-  }
 
   // ── POST /jobs/:id/request-payout — technician requests payout ────────────
   @Post(':id/request-payout')

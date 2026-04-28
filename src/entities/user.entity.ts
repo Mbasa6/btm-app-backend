@@ -57,4 +57,18 @@ export class User {
 
   @Column({ nullable: true })
   phoneNumber?: string;
+
+  // ── PUSH NOTIFICATIONS ────────────────────────────────────────────────────
+  @Column({ nullable: true, type: 'varchar', length: 500 })
+  expoPushToken?: string;
+
+  // ── BANK DETAILS (for technician payout) ─────────────────────────────────
+  @Column({ nullable: true, type: 'varchar', length: 255 })
+  bankName?: string;
+
+  @Column({ nullable: true, type: 'varchar', length: 100 })
+  bankAccountNumber?: string;
+
+  @Column({ nullable: true, type: 'varchar', length: 255 })
+  bankAccountHolder?: string;
 }

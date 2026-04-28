@@ -191,6 +191,34 @@ export class JobController {
     return this.jobService.revertToPending(id);
   }
 
+  // ── PATCH /jobs/:id/revert-pending — admin reverts job to pending ────────────
+  @Patch(':id/revert-pending')
+  @Roles('admin')
+  revertToPending(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.revertToPending(id);
+  }
+
+  // ── POST /jobs/:id/request-payout — technician requests payout ────────────
+  @Post(':id/request-payout')
+  @Roles('technician')
+  requestPayout(@GetUser() user: User, @Param('id', ParseIntPipe) id: number) {
+    return this.jobService.requestPayout(user, id);
+  }
+
+  // ── PATCH /jobs/:id/approve-payout — admin approves payout ────────────────
+  @Patch(':id/approve-payout')
+  @Roles('admin')
+  approvePayout(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.approvePayout(id);
+  }
+
+  // ── PATCH /jobs/:id/mark-paid — admin marks payout as paid ────────────────
+  @Patch(':id/mark-paid')
+  @Roles('admin')
+  markPayoutPaid(@Param('id', ParseIntPipe) id: number) {
+    return this.jobService.markPayoutPaid(id);
+  }
+
   // ── GET /jobs/:id — keep last to avoid swallowing named routes ─────────────
   @Get(':id')
   @Roles('admin', 'client', 'technician')

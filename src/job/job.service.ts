@@ -140,7 +140,11 @@ export class JobService {
     return [];
   }
 
-  // ─── GET PENDING JOBS ASSIGNED TO THIS TECHNICIAN ────────────────────────
+  // ─── GET PENDING JOBS FOR THIS TECHNICIAN ────────────────────────────────
+  // Returns:
+  //   a) Jobs explicitly assigned to this tech (no radius restriction)
+  //   b) Unassigned paid-pending jobs within JOB_RADIUS_KM of the technician
+  //      (or all unassigned if tech has no location set)
   async getAssignedJobs(technician: User) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
     if (!freshTech) throw new NotFoundException('Technician not found');
@@ -158,7 +162,34 @@ export class JobService {
       .orderBy('job.id', 'DESC')
       .getMany();
 
-    return jobs.filter((job) => !job.declinedBy?.some((u) => u.id === technician.id));
+    // Filter out declined
+    const notDeclined = jobs.filter(
+      (job) => !job.declinedBy?.some((u) => u.id === technician.id),
+    );
+
+    // For unassigned jobs, apply radius filter if the technician has a location
+    const techLat = freshTech.latitude;
+    const techLng = freshTech.longitude;
+    const hasLocation = techLat != null && techLng != null;
+
+    return notDeclined.filter((job) => {
+      // Admin-assigned to this tech — always show
+      if (job.technician?.id === technician.id) return true;
+
+      // Unassigned job with no client location — show to all techs
+      if (job.clientLatitude == null || job.clientLongitude == null) return true;
+
+      // Unassigned job: apply radius only if tech has location
+      if (!hasLocation) return true; // tech has no location set yet — show all
+
+      const distKm = this.haversineKm(
+        techLat!,
+        techLng!,
+        job.clientLatitude,
+        job.clientLongitude,
+      );
+      return distKm <= JOB_RADIUS_KM;
+    });
   }
 
   // ─── ADMIN: GET ALL JOBS ─────────────────────────────────────────────────

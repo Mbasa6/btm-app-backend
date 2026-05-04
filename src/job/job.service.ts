@@ -69,11 +69,19 @@ export class JobService {
 
     if (!job) throw new NotFoundException('Job not found');
     if (job.status !== JobStatus.PENDING) throw new ForbiddenException('Job not available');
-    if (job.technician?.id !== freshTech.id) throw new ForbiddenException('This job was not assigned to you');
+    if (job.technician && job.technician.id !== freshTech.id) {
+      throw new ForbiddenException('This job is already assigned to another technician');
+    }
 
     // 🔐 PAYMENT GATE
     if (!job.payment || job.payment.status !== PaymentStatus.PAID) {
       throw new ForbiddenException('Job not dispatchable');
+    }
+
+    // Allow technician self-claim if job is still unassigned.
+    if (!job.technician) {
+      job.technician = freshTech;
+      job.dispatchedAt = new Date();
     }
 
     job.status = JobStatus.ACCEPTED;
@@ -100,9 +108,14 @@ export class JobService {
 
     if (!job) throw new NotFoundException('Job not found');
     if (job.status !== JobStatus.PENDING) throw new ForbiddenException('Cannot decline');
+    if (job.technician && job.technician.id !== technician.id) {
+      throw new ForbiddenException('Cannot decline a job assigned to another technician');
+    }
 
     if (!job.declinedBy) job.declinedBy = [];
-    job.declinedBy.push(technician);
+    if (!job.declinedBy.some((u) => u.id === technician.id)) {
+      job.declinedBy.push(technician);
+    }
 
     if (job.technician?.id === technician.id) {
       job.technician = null;
@@ -127,7 +140,7 @@ export class JobService {
     return [];
   }
 
-  // ─── GET PENDING JOBS FOR TECHNICIAN ─────────────────────────────────────
+  // ─── GET PENDING JOBS ASSIGNED TO THIS TECHNICIAN ────────────────────────
   async getAssignedJobs(technician: User) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
     if (!freshTech) throw new NotFoundException('Technician not found');
@@ -135,42 +148,17 @@ export class JobService {
     const jobs = await this.jobsRepo
       .createQueryBuilder('job')
       .leftJoinAndSelect('job.client', 'client')
+      .leftJoinAndSelect('job.technician', 'technician')
       .leftJoinAndSelect('job.payment', 'payment')
-      .leftJoinAndSelect('job.declinedBy', 'declinedBy')
       .leftJoinAndSelect('job.serviceItem', 'serviceItem')
+      .leftJoinAndSelect('job.declinedBy', 'declinedBy')
       .where('job.status = :status', { status: JobStatus.PENDING })
+      .andWhere('(technician.id = :techId OR technician.id IS NULL)', { techId: technician.id })
       .andWhere('payment.status = :paid', { paid: PaymentStatus.PAID })
-      .andWhere(
-        ':techId NOT IN (SELECT userId FROM job_declined_by_user WHERE jobId = job.id)',
-        { techId: technician.id },
-      )
+      .orderBy('job.id', 'DESC')
       .getMany();
 
-    if (freshTech.latitude == null || freshTech.longitude == null) {
-      return jobs.map(job => ({ ...job, distanceKm: null }));
-    }
-
-    const nearbyJobs = jobs
-      .map(job => {
-        if (job.clientLatitude == null || job.clientLongitude == null) {
-          return { ...job, distanceKm: null };
-        }
-        const distanceKm = this.haversineKm(
-          freshTech.latitude!,
-          freshTech.longitude!,
-          job.clientLatitude,
-          job.clientLongitude,
-        );
-        return { ...job, distanceKm };
-      })
-      .filter(job => job.distanceKm === null || job.distanceKm <= JOB_RADIUS_KM)
-      .sort((a, b) => {
-        if (a.distanceKm === null) return 1;
-        if (b.distanceKm === null) return -1;
-        return a.distanceKm - b.distanceKm;
-      });
-
-    return nearbyJobs;
+    return jobs.filter((job) => !job.declinedBy?.some((u) => u.id === technician.id));
   }
 
   // ─── ADMIN: GET ALL JOBS ─────────────────────────────────────────────────
@@ -183,7 +171,6 @@ export class JobService {
 
   // ─── STATUS TRANSITION ───────────────────────────────────────────────────
   private readonly validTransitions = {
-    [JobStatus.PENDING]: [JobStatus.ACCEPTED],
     [JobStatus.ACCEPTED]: [JobStatus.IN_PROGRESS],
     [JobStatus.IN_PROGRESS]: [JobStatus.COMPLETED],
     [JobStatus.COMPLETED]: [JobStatus.CLOSED],

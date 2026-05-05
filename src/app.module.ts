@@ -9,6 +9,7 @@ import { JobModule } from './job/job.module';
 import { ServicesModule } from './services/services.module';
 import { PaymentModule } from './payment/payment.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     JobModule,
     ServicesModule,
     PaymentModule,
-    DashboardModule
+    DashboardModule,
+    NotificationModule,
   ],
    controllers: [AppController], // 👈 Make sure this line exists
    providers: [AppService],

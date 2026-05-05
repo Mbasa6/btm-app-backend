@@ -14,6 +14,7 @@ import { PaymentStatus } from '../payment/payment-status.enum';
 import { ServiceItem } from '../entities/service-item.entity';
 import { RateJobDto } from '../dto/rate-job.dto';
 import { PushNotificationService } from './push-notification.service';
+import { NotificationService } from '../notification/notification.service';
 
 const JOB_RADIUS_KM = 20;
 const PAYOUT_FLOOR = 500;
@@ -28,6 +29,7 @@ export class JobService {
     @InjectRepository(ServiceItem)
     private serviceItemRepo: Repository<ServiceItem>,
     private pushService: PushNotificationService,
+    private notificationService: NotificationService,
   ) {}
 
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
@@ -265,6 +267,14 @@ export class JobService {
       { jobId: job.id },
     );
 
+    await this.notificationService.createForUser(
+      tech,
+      'New Job Assigned',
+      `You have been assigned job: ${job.title}. Please accept or decline.`,
+      'job_assigned',
+      { jobId: job.id },
+    );
+
     return saved;
   }
 
@@ -303,6 +313,16 @@ export class JobService {
       { jobId: job.id },
     );
 
+    if (job.technician) {
+      await this.notificationService.createForUser(
+        job.technician,
+        'Payout Approved',
+        `Your payout of R${job.technicianPayout} for "${job.title}" has been approved. Payment is on the way.`,
+        'payout_approved',
+        { jobId: job.id },
+      );
+    }
+
     return saved;
   }
 
@@ -325,6 +345,16 @@ export class JobService {
       `Your payout of R${job.technicianPayout} for "${job.title}" has been paid.`,
       { jobId: job.id },
     );
+
+    if (job.technician) {
+      await this.notificationService.createForUser(
+        job.technician,
+        'Payout Paid',
+        `Your payout of R${job.technicianPayout} for "${job.title}" has been paid.`,
+        'payout_paid',
+        { jobId: job.id },
+      );
+    }
 
     return saved;
   }

@@ -1,19 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user.entity';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
 import { UpdateLocationDto } from '../dto/update-location.dto';
-import { NotificationService } from '../notification/notification.service';
+import { Notification } from '../entities/notification.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-    @Inject(forwardRef(() => NotificationService))
-    private notificationService: NotificationService,
+    @InjectRepository(Notification)
+    private notificationRepo: Repository<Notification>,
   ) {}
 
   getAllTechnicians(): Promise<User[]> {
@@ -82,12 +82,15 @@ export class UserService {
 
     // 🔔 Notify user when their account is approved/activated
     if (isActive && wasInactive && user.role !== 'admin') {
-      await this.notificationService.createForUser(
-        saved,
-        '✅ Account Approved!',
-        `Great news, ${user.fullName}! Your account has been approved by admin. You now have full access to BTM Fibre Connect.`,
-        'general',
-      );
+      const notification = this.notificationRepo.create({
+        user: saved,
+        title: '✅ Account Approved!',
+        body: `Great news, ${user.fullName}! Your account has been approved by admin. You now have full access to BTM Fibre Connect.`,
+        type: 'general',
+        isRead: false,
+        data: null,
+      });
+      await this.notificationRepo.save(notification);
     }
 
     return saved;

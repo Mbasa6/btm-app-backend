@@ -1,16 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user.entity';
 import { UpdateUserStatusDto } from '../dto/update-user-status.dto';
 import { UpdateLocationDto } from '../dto/update-location.dto';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @Inject(forwardRef(() => NotificationService))
+    private notificationService: NotificationService,
   ) {}
 
   getAllTechnicians(): Promise<User[]> {
@@ -73,8 +76,21 @@ export class UserService {
   async setUserActiveStatus(userId: number, isActive: boolean) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
+    const wasInactive = !user.isActive;
     user.isActive = isActive;
-    return this.usersRepository.save(user);
+    const saved = await this.usersRepository.save(user);
+
+    // 🔔 Notify user when their account is approved/activated
+    if (isActive && wasInactive && user.role !== 'admin') {
+      await this.notificationService.createForUser(
+        saved,
+        '✅ Account Approved!',
+        `Great news, ${user.fullName}! Your account has been approved by admin. You now have full access to BTM Fibre Connect.`,
+        'general',
+      );
+    }
+
+    return saved;
   }
 
   async findById(id: number): Promise<User> {

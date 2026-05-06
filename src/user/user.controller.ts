@@ -27,6 +27,23 @@ import { UpdateLocationDto } from '../dto/update-location.dto';
 export class UserController {
   constructor(private userService: UserService) {}
 
+  /**
+   * GET /users/me
+   * Returns the current user's fresh approval and active status.
+   * Used by the frontend to poll and reflect approval without logout.
+   */
+  @Get('me')
+  @Roles('admin', 'technician', 'client')
+  getMe(@GetUser() user: User) {
+    return this.userService.findById(user.id).then((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      role: u.role,
+      isActive: u.isActive,
+      approvalStatus: u.approvalStatus,
+    }));
+  }
+
   @Get('technicians')
   @Roles('admin')
   getAllTechnicians() {

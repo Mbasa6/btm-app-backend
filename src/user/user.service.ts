@@ -15,8 +15,8 @@ export class UserService {
 
   getAllTechnicians(): Promise<User[]> {
     return this.usersRepository.find({
-      where: { role: 'technician' },
-      select: ['id', 'fullName', 'email', 'phoneNumber', 'isAvailable', 'role'],
+      where: { role: 'technician', isActive: true },
+      select: ['id', 'fullName', 'email', 'phoneNumber', 'isAvailable', 'role', 'isActive'],
       order: { fullName: 'ASC' },
     });
   }
@@ -31,7 +31,7 @@ export class UserService {
 
   getAllUsers(): Promise<User[]> {
     return this.usersRepository.find({
-      select: ['id', 'fullName', 'email', 'phoneNumber', 'role', 'isAvailable', 'approvalStatus'],
+      select: ['id', 'fullName', 'email', 'phoneNumber', 'role', 'isAvailable', 'isActive', 'approvalStatus'],
       order: { id: 'ASC' },
     });
   }
@@ -54,6 +54,9 @@ export class UserService {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     if (user.role !== 'technician') throw new ForbiddenException('User is not a technician');
+    if (!user.isActive && isAvailable) {
+      throw new ForbiddenException('Inactive technicians cannot be set as available');
+    }
     user.isAvailable = isAvailable;
     return this.usersRepository.save(user);
   }

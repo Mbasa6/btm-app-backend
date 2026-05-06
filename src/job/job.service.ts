@@ -34,12 +34,18 @@ export class JobService {
 
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
   async createJob(client: User, dto: CreateJobDto, clientImagePaths: string[] = []) {
+    const freshClient = await this.userRepo.findOne({ where: { id: client.id } });
+    if (!freshClient) throw new NotFoundException('Client not found');
+    if (!freshClient.isActive || freshClient.approvalStatus !== 'APPROVED') {
+      throw new ForbiddenException('Your account is pending approval. You cannot create jobs yet.');
+    }
+
     const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
     if (!serviceItem) throw new NotFoundException('Service item not found');
 
     const job = this.jobsRepo.create({
       ...dto,
-      client,
+      client: freshClient,
       status: JobStatus.PENDING,
       serviceItem,
       clientLatitude: dto.clientLatitude ?? null,
@@ -60,7 +66,7 @@ export class JobService {
   async acceptJob(technician: User, jobId: number) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
 
-    if (!freshTech || !freshTech.isAvailable) {
+    if (!freshTech || !freshTech.isActive || freshTech.approvalStatus !== 'APPROVED' || !freshTech.isAvailable) {
       throw new ForbiddenException('Technician not available');
     }
 
@@ -150,6 +156,9 @@ export class JobService {
   async getAssignedJobs(technician: User) {
     const freshTech = await this.userRepo.findOne({ where: { id: technician.id } });
     if (!freshTech) throw new NotFoundException('Technician not found');
+    if (!freshTech.isActive || freshTech.approvalStatus !== 'APPROVED') {
+      return [];
+    }
 
     const jobs = await this.jobsRepo
       .createQueryBuilder('job')

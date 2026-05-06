@@ -13,7 +13,9 @@ export class ApprovalGuard implements CanActivate {
     const user = req.user;
 
     if (user.approvalStatus !== 'APPROVED') {
-      throw new ForbiddenException('Account not approved');
+      if (req.method !== 'GET') {
+        throw new ForbiddenException('Account not approved');
+      }
     }
 
     return true;

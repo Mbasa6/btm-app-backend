@@ -7,10 +7,11 @@ import { ServicesController } from './services.controller';
 import { User } from '../entities/user.entity';
 import { UserService } from '../user/user.service';
 import { UserController } from '../user/user.controller';
+import { Notification } from '../entities/notification.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ServiceCategory, ServiceItem, User])],
-  controllers: [ServicesController,UserController,],
+  imports: [TypeOrmModule.forFeature([ServiceCategory, ServiceItem, User, Notification])],
+  controllers: [ServicesController, UserController],
   providers: [ServicesService, UserService],
   exports: [ServicesService, UserService],
 })

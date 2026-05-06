@@ -34,7 +34,10 @@ export class AuthService {
 
     await this.usersRepo.save(user);
 
-    return { message: 'User registered successfully' };
+    return {
+      message:
+        'Account created successfully. Please wait for admin approval before booking jobs or receiving assignments.',
+    };
   }
 
 
@@ -54,6 +57,8 @@ export class AuthService {
         access_token: token,
          role: user.role,
          userId: user.id,
+         approvalStatus: user.approvalStatus,
+         isActive: user.isActive,
          };
   }
 }

@@ -66,6 +66,19 @@ export class Job {
   @Column({ type: 'varchar', length: 500, nullable: true })
   address: string | null;
 
+  // ─── MANUAL CLIENT DETAILS (admin-created WhatsApp/off-app bookings) ─────
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  manualClientName: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  manualClientSurname: string | null;
+
+  @Column({ type: 'varchar', length: 180, nullable: true })
+  manualClientEmail: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  manualClientPhone: string | null;
+
   // ─── IMAGES ───────────────────────────────────────────────────────────────
   @Column({ type: 'json', nullable: true })
   clientImages: string[];

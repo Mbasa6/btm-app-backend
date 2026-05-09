@@ -51,7 +51,7 @@ export class JobController {
 
   // ── POST /jobs — client creates booking with optional reference photos ─────
   @Post()
-  @Roles('client')
+  @Roles('client', 'admin')
   @UseInterceptors(
     FilesInterceptor('clientImages', 4, { storage: imageStorage('client') }),
   )

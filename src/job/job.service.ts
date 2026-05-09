@@ -33,19 +33,67 @@ export class JobService {
   ) {}
 
   // ─── CREATE JOB ─────────────────────────────────────────────────────────
-  async createJob(client: User, dto: CreateJobDto, clientImagePaths: string[] = []) {
-    const freshClient = await this.userRepo.findOne({ where: { id: client.id } });
-    if (!freshClient) throw new NotFoundException('Client not found');
-    if (!freshClient.isActive || freshClient.approvalStatus !== 'APPROVED') {
-      throw new ForbiddenException('Your account is pending approval. You cannot create jobs yet.');
+  async createJob(actor: User, dto: CreateJobDto, clientImagePaths: string[] = []) {
+    const requester = await this.userRepo.findOne({ where: { id: actor.id } });
+    if (!requester) throw new NotFoundException('User not found');
+
+    let bookingClient: User;
+    let manualClientName: string | null = null;
+    let manualClientSurname: string | null = null;
+    let manualClientEmail: string | null = null;
+    let manualClientPhone: string | null = null;
+
+    if (requester.role === 'admin') {
+      const requestedClientId = dto.clientId != null ? Number(dto.clientId) : null;
+
+      if (requestedClientId && !Number.isNaN(requestedClientId)) {
+        const selectedClient = await this.userRepo.findOne({
+          where: { id: requestedClientId, role: 'client' },
+        });
+        if (!selectedClient) {
+          throw new NotFoundException('Selected client not found');
+        }
+        if (!selectedClient.isActive || selectedClient.approvalStatus !== 'APPROVED') {
+          throw new ForbiddenException('Selected client is not active/approved yet.');
+        }
+        bookingClient = selectedClient;
+      } else {
+        const name = dto.manualClientName?.trim();
+        const surname = dto.manualClientSurname?.trim();
+        const email = dto.manualClientEmail?.trim();
+        const phone = dto.manualClientPhone?.trim();
+        if (!name || !surname || !email || !phone) {
+          throw new BadRequestException(
+            'Manual client details are required (name, surname, email, phone) when no client account is selected.',
+          );
+        }
+
+        // WhatsApp/manual booking fallback when no app client account is selected.
+        bookingClient = requester;
+        manualClientName = name;
+        manualClientSurname = surname;
+        manualClientEmail = email;
+        manualClientPhone = phone;
+      }
+    } else {
+      if (!requester.isActive || requester.approvalStatus !== 'APPROVED') {
+        throw new ForbiddenException('Your account is pending approval. You cannot create jobs yet.');
+      }
+      bookingClient = requester;
     }
 
     const serviceItem = await this.serviceItemRepo.findOne({ where: { id: dto.serviceItemId } });
     if (!serviceItem) throw new NotFoundException('Service item not found');
 
+    const { clientId: _ignoredClientId, ...jobInput } = dto;
+
     const job = this.jobsRepo.create({
-      ...dto,
-      client: freshClient,
+      ...jobInput,
+      client: bookingClient,
+      manualClientName,
+      manualClientSurname,
+      manualClientEmail,
+      manualClientPhone,
       status: JobStatus.PENDING,
       serviceItem,
       clientLatitude: dto.clientLatitude ?? null,

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsNumber, IsEmail } from 'class-validator';
 
 export class CreateJobDto {
   @IsNotEmpty()
@@ -26,4 +26,25 @@ export class CreateJobDto {
   @IsOptional()
   @IsNumber()
   clientLongitude?: number;
+
+  // Admin-only: create a booking on behalf of an existing client account.
+  @IsOptional()
+  @IsNumber()
+  clientId?: number;
+
+  @IsOptional()
+  @IsString()
+  manualClientName?: string;
+
+  @IsOptional()
+  @IsString()
+  manualClientSurname?: string;
+
+  @IsOptional()
+  @IsEmail()
+  manualClientEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  manualClientPhone?: string;
 }

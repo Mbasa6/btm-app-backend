@@ -1,4 +1,4 @@
-import { IsNumber, Min, Max } from 'class-validator';
+import { IsNumber, Min, Max, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateLocationDto {
   @IsNumber()
@@ -10,4 +10,9 @@ export class UpdateLocationDto {
   @Min(-180)
   @Max(180)
   longitude: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  areaLabel?: string;
 }

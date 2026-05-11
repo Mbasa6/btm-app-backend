@@ -34,6 +34,9 @@ export class User {
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   longitude?: number;
 
+  @Column({ nullable: true, type: 'varchar', length: 120 })
+  lastSavedAreaLocation?: string;
+
   @Column({ default: false })
   isAvailable: boolean;
 

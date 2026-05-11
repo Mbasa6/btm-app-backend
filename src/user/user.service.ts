@@ -122,6 +122,9 @@ export class UserService {
 
     user.latitude = dto.latitude;
     user.longitude = dto.longitude;
+    if (dto.areaLabel !== undefined) {
+      user.lastSavedAreaLocation = dto.areaLabel?.trim() || undefined;
+    }
     await this.usersRepository.save(user);
 
     return { message: 'Location updated successfully' };

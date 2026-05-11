@@ -15,8 +15,9 @@ import { ServiceItem } from '../entities/service-item.entity';
 import { RateJobDto } from '../dto/rate-job.dto';
 import { PushNotificationService } from './push-notification.service';
 import { NotificationService } from '../notification/notification.service';
+import { ApprovalStatus } from '../user/approval-status.enum';
 
-const JOB_RADIUS_KM = 20;
+const JOB_RADIUS_KM = 75;
 const PAYOUT_FLOOR = 500;
 
 @Injectable()
@@ -251,6 +252,39 @@ export class JobService {
     });
   }
 
+  // ─── ADMIN: TECHNICIANS WITHIN JOB RADIUS ────────────────────────────────
+  async getAssignableTechnicians(jobId: number) {
+    const job = await this.jobsRepo.findOne({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Job not found');
+
+    // Radius filtering is based on job/client coordinates.
+    if (job.clientLatitude == null || job.clientLongitude == null) {
+      return [];
+    }
+
+    const technicians = await this.userRepo.find({
+      where: {
+        role: 'technician',
+        isActive: true,
+        approvalStatus: ApprovalStatus.APPROVED,
+      },
+    });
+
+    return technicians
+      .filter((tech) => tech.latitude != null && tech.longitude != null)
+      .map((tech) => {
+        const distanceKm = this.haversineKm(
+          Number(tech.latitude),
+          Number(tech.longitude),
+          Number(job.clientLatitude),
+          Number(job.clientLongitude),
+        );
+        return { ...tech, distanceKm };
+      })
+      .filter((tech) => tech.distanceKm <= JOB_RADIUS_KM)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }
+
   // ─── ADMIN: GET ALL JOBS ─────────────────────────────────────────────────
   async getAllJobs() {
     return this.jobsRepo.find({
@@ -300,6 +334,23 @@ export class JobService {
       where: { id: technicianId, role: 'technician', isActive: true },
     });
     if (!tech) throw new NotFoundException('Technician not found or inactive');
+
+    if (job.clientLatitude == null || job.clientLongitude == null) {
+      throw new BadRequestException('Job location is required before assigning a technician.');
+    }
+    if (tech.latitude == null || tech.longitude == null) {
+      throw new BadRequestException('Selected technician has no location set.');
+    }
+
+    const distanceKm = this.haversineKm(
+      Number(tech.latitude),
+      Number(tech.longitude),
+      Number(job.clientLatitude),
+      Number(job.clientLongitude),
+    );
+    if (distanceKm > JOB_RADIUS_KM) {
+      throw new ForbiddenException(`Technician is outside the ${JOB_RADIUS_KM}km assignment radius.`);
+    }
 
     job.technician = tech;
     // ✅ Status stays PENDING — tech must accept explicitly

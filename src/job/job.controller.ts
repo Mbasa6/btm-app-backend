@@ -111,6 +111,13 @@ export class JobController {
     return this.jobService.updateJobStatus(id, dto.status);
   }
 
+  // ── GET /jobs/:id/assignable-technicians ──────────────────────────────────
+  @Get(':id/assignable-technicians')
+  @Roles('admin')
+  getAssignableTechnicians(@Param('id', ParseIntPipe) jobId: number) {
+    return this.jobService.getAssignableTechnicians(jobId);
+  }
+
   // ── PATCH /jobs/:id/assign/:techId ─────────────────────────────────────────
   @Patch(':id/assign/:techId')
   @Roles('admin')

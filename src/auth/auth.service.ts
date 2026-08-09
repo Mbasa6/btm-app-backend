@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +18,8 @@ const MAX_RESET_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
@@ -25,6 +27,20 @@ export class AuthService {
     private notificationService: NotificationService,
     private mailerService: MailerService,
   ) {}
+
+  private maskEmail(email: string) {
+    const [localPart, domainPart] = email.split('@');
+
+    if (!localPart || !domainPart) {
+      return 'invalid-email';
+    }
+
+    if (localPart.length <= 2) {
+      return `${localPart[0] || '*'}*@${domainPart}`;
+    }
+
+    return `${localPart[0]}***${localPart[localPart.length - 1]}@${domainPart}`;
+  }
 
   async register(registerDto: RegisterUserDto) {
     const { email, password, fullName, role, phoneNumber } = registerDto;
@@ -85,10 +101,14 @@ export class AuthService {
 
   async requestPasswordReset(requestDto: ForgotPasswordRequestDto) {
     const email = requestDto.email.trim().toLowerCase();
+    const maskedEmail = this.maskEmail(email);
+    this.logger.log(`[PASSWORD_RESET_REQUEST] Received request for ${maskedEmail}`);
+
     const user = await this.usersRepo.findOne({ where: { email } });
 
     // Always return a generic message to avoid exposing valid account emails.
     if (!user) {
+      this.logger.log(`[PASSWORD_RESET_REQUEST] No matching user for ${maskedEmail}`);
       return { message: 'If an account exists, a reset code has been sent.' };
     }
 
@@ -96,6 +116,7 @@ export class AuthService {
     const lastRequestedAt = user.passwordResetLastRequestedAt;
 
     if (lastRequestedAt && now.getTime() - new Date(lastRequestedAt).getTime() < RESET_REQUEST_THROTTLE_MS) {
+      this.logger.warn(`[PASSWORD_RESET_REQUEST] Throttled request for ${maskedEmail}`);
       return { message: 'If an account exists, a reset code has been sent.' };
     }
 
@@ -107,19 +128,22 @@ export class AuthService {
     user.passwordResetAttemptCount = 0;
     user.passwordResetLastRequestedAt = now;
     await this.usersRepo.save(user);
+    this.logger.log(`[PASSWORD_RESET_REQUEST] Reset code generated for ${maskedEmail}`);
 
     try {
       await this.mailerService.sendPasswordResetCode(email, code);
-      console.log(`[BTM][PasswordReset] Reset code email sent to ${email}`);
+      this.logger.log(`[PASSWORD_RESET_REQUEST] Reset code email sent to ${maskedEmail}`);
     } catch (error: any) {
-      console.error(`[BTM][PasswordReset] Failed to send reset code email to ${email}:`, error?.message || error);
+      this.logger.error(
+        `[PASSWORD_RESET_REQUEST] Failed to send reset code email to ${maskedEmail}: ${error?.message || error}`,
+      );
 
       if (process.env.NODE_ENV === 'production') {
         throw new InternalServerErrorException('Unable to send reset code right now. Please try again later.');
       }
 
       // Keep local/dev testing unblocked when SMTP is unavailable.
-      console.log(`[BTM][PasswordReset][DEV] ${email} reset code: ${code}`);
+      this.logger.warn(`[PASSWORD_RESET_REQUEST][DEV] Fallback code for ${maskedEmail}: ${code}`);
     }
 
     const response: { message: string; resetCode?: string } = {
@@ -135,9 +159,13 @@ export class AuthService {
 
   async confirmPasswordReset(confirmDto: ResetPasswordConfirmDto) {
     const email = confirmDto.email.trim().toLowerCase();
+    const maskedEmail = this.maskEmail(email);
+    this.logger.log(`[PASSWORD_RESET_CONFIRM] Received confirm request for ${maskedEmail}`);
+
     const user = await this.usersRepo.findOne({ where: { email } });
 
     if (!user || !user.passwordResetCodeHash || !user.passwordResetExpiresAt) {
+      this.logger.warn(`[PASSWORD_RESET_CONFIRM] Missing reset context for ${maskedEmail}`);
       throw new UnauthorizedException('Invalid or expired reset code');
     }
 
@@ -147,10 +175,12 @@ export class AuthService {
       user.passwordResetExpiresAt = undefined;
       user.passwordResetAttemptCount = 0;
       await this.usersRepo.save(user);
+      this.logger.warn(`[PASSWORD_RESET_CONFIRM] Expired code for ${maskedEmail}`);
       throw new UnauthorizedException('Invalid or expired reset code');
     }
 
     if ((user.passwordResetAttemptCount ?? 0) >= MAX_RESET_ATTEMPTS) {
+      this.logger.warn(`[PASSWORD_RESET_CONFIRM] Too many attempts for ${maskedEmail}`);
       throw new UnauthorizedException('Too many invalid attempts. Request a new reset code.');
     }
 
@@ -159,6 +189,7 @@ export class AuthService {
     if (!isValidCode) {
       user.passwordResetAttemptCount = (user.passwordResetAttemptCount ?? 0) + 1;
       await this.usersRepo.save(user);
+      this.logger.warn(`[PASSWORD_RESET_CONFIRM] Invalid code for ${maskedEmail}`);
       throw new UnauthorizedException('Invalid or expired reset code');
     }
 
@@ -167,6 +198,7 @@ export class AuthService {
     user.passwordResetExpiresAt = undefined;
     user.passwordResetAttemptCount = 0;
     await this.usersRepo.save(user);
+    this.logger.log(`[PASSWORD_RESET_CONFIRM] Password reset successful for ${maskedEmail}`);
 
     return { message: 'Password reset successful. You can now sign in with your new password.' };
   }

@@ -138,23 +138,10 @@ export class AuthService {
         `[PASSWORD_RESET_REQUEST] Failed to send reset code email to ${maskedEmail}: ${error?.message || error}`,
       );
 
-      if (process.env.NODE_ENV === 'production') {
-        throw new InternalServerErrorException('Unable to send reset code right now. Please try again later.');
-      }
-
-      // Keep local/dev testing unblocked when SMTP is unavailable.
-      this.logger.warn(`[PASSWORD_RESET_REQUEST][DEV] Fallback code for ${maskedEmail}: ${code}`);
+      throw new InternalServerErrorException('Unable to send reset code right now. Please try again later.');
     }
 
-    const response: { message: string; resetCode?: string } = {
-      message: 'If an account exists, a reset code has been sent.',
-    };
-
-    if (process.env.NODE_ENV !== 'production') {
-      response.resetCode = code;
-    }
-
-    return response;
+    return { message: 'If an account exists, a reset code has been sent.' };
   }
 
   async confirmPasswordReset(confirmDto: ResetPasswordConfirmDto) {

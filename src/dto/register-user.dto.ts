@@ -9,7 +9,7 @@ export class RegisterUserDto {
   fullName: string;
 
   @IsNotEmpty()
-  @IsEmail()
+  @IsEmail({}, { message: 'Please enter a valid email address' })
   email: string;
 
   @MinLength(6, { message: 'Password must be at least 6 characters long' })

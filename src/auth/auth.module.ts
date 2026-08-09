@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../entities/user.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { NotificationModule } from '../notification/notification.module';
+import { MailerModule } from '../mailer/mailer.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { NotificationModule } from '../notification/notification.module';
       signOptions: { expiresIn: '1d' },
     }),
     NotificationModule,
+    MailerModule,
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],

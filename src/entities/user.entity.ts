@@ -74,4 +74,17 @@ export class User {
 
   @Column({ nullable: true, type: 'varchar', length: 255 })
   bankAccountHolder?: string;
+
+  // ── PASSWORD RESET TRACKING ───────────────────────────────────────────────
+  @Column({ nullable: true, type: 'varchar', length: 255 })
+  passwordResetCodeHash?: string;
+
+  @Column({ nullable: true, type: 'datetime' })
+  passwordResetExpiresAt?: Date;
+
+  @Column({ type: 'int', default: 0 })
+  passwordResetAttemptCount: number;
+
+  @Column({ nullable: true, type: 'datetime' })
+  passwordResetLastRequestedAt?: Date;
 }

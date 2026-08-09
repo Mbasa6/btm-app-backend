@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +10,7 @@ import { LoginDto } from '../dto/login.dto';
 import { NotificationService } from '../notification/notification.service';
 import { ForgotPasswordRequestDto } from '../dto/forgot-password-request.dto';
 import { ResetPasswordConfirmDto } from '../dto/reset-password-confirm.dto';
+import { MailerService } from '../mailer/mailer.service';
 
 const RESET_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_REQUEST_THROTTLE_MS = 60 * 1000;
@@ -22,6 +23,7 @@ export class AuthService {
     private usersRepo: Repository<User>,
     private jwtService: JwtService,
     private notificationService: NotificationService,
+    private mailerService: MailerService,
   ) {}
 
   async register(registerDto: RegisterUserDto) {
@@ -106,8 +108,19 @@ export class AuthService {
     user.passwordResetLastRequestedAt = now;
     await this.usersRepo.save(user);
 
-    // TODO: replace with email/SMS provider in production.
-    console.log(`[BTM][PasswordReset] ${email} reset code: ${code}`);
+    try {
+      await this.mailerService.sendPasswordResetCode(email, code);
+      console.log(`[BTM][PasswordReset] Reset code email sent to ${email}`);
+    } catch (error: any) {
+      console.error(`[BTM][PasswordReset] Failed to send reset code email to ${email}:`, error?.message || error);
+
+      if (process.env.NODE_ENV === 'production') {
+        throw new InternalServerErrorException('Unable to send reset code right now. Please try again later.');
+      }
+
+      // Keep local/dev testing unblocked when SMTP is unavailable.
+      console.log(`[BTM][PasswordReset][DEV] ${email} reset code: ${code}`);
+    }
 
     const response: { message: string; resetCode?: string } = {
       message: 'If an account exists, a reset code has been sent.',

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -130,16 +130,17 @@ export class AuthService {
     await this.usersRepo.save(user);
     this.logger.log(`[PASSWORD_RESET_REQUEST] Reset code generated for ${maskedEmail}`);
 
-    try {
-      await this.mailerService.sendPasswordResetCode(email, code);
-      this.logger.log(`[PASSWORD_RESET_REQUEST] Reset code email sent to ${maskedEmail}`);
-    } catch (error: any) {
-      this.logger.error(
-        `[PASSWORD_RESET_REQUEST] Failed to send reset code email to ${maskedEmail}: ${error?.message || error}`,
-      );
-
-      throw new InternalServerErrorException('Unable to send reset code right now. Please try again later.');
-    }
+    // Do not block API response on SMTP transport; send in background.
+    void this.mailerService
+      .sendPasswordResetCode(email, code)
+      .then(() => {
+        this.logger.log(`[PASSWORD_RESET_REQUEST] Reset code email sent to ${maskedEmail}`);
+      })
+      .catch((error: any) => {
+        this.logger.error(
+          `[PASSWORD_RESET_REQUEST] Failed to send reset code email to ${maskedEmail}: ${error?.message || error}`,
+        );
+      });
 
     return { message: 'If an account exists, a reset code has been sent.' };
   }
